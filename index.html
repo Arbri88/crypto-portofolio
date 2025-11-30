@@ -2550,16 +2550,21 @@ function renderNews(isFallback = false) {
   filtered.forEach(item => {
     const card = document.createElement("article");
     card.className = "min-w-[240px] snap-start rounded-2xl border border-slate-800 bg-slate-900/40 p-3 flex flex-col gap-2";
+    const safeSource = escapeHtml(item.source || "");
+    const safeTitle = escapeHtml(item.title || "");
+    const safeSummary = escapeHtml(item.summary || "");
+    const safeUrl = escapeHtml(item.url || "#");
+    const tags = (item.coins || []).slice(0, 3)
+      .map(tag => `<span class="px-1.5 py-0.5 rounded-full bg-slate-800/70">${escapeHtml(tag)}</span>`)
+      .join("");
     card.innerHTML = `
       <div class="flex items-center justify-between text-[10px] text-slate-500">
-        <span>${item.source}</span>
+        <span>${safeSource}</span>
         <span>${humanizeTimeAgo(item.publishedAt)}</span>
       </div>
-      <a href="${item.url}" target="_blank" rel="noopener" class="text-sm font-semibold text-slate-100 line-clamp-3 hover:text-emerald-300">${item.title}</a>
-      <p class="text-[11px] text-slate-500 line-clamp-2">${item.summary}</p>
-      <div class="flex flex-wrap gap-1 text-[10px] text-slate-400">
-        ${item.coins.slice(0,3).map(tag => `<span class="px-1.5 py-0.5 rounded-full bg-slate-800/70">${tag}</span>`).join("")}
-      </div>`;
+      <a href="${safeUrl}" target="_blank" rel="noopener" class="text-sm font-semibold text-slate-100 line-clamp-3 hover:text-emerald-300">${safeTitle}</a>
+      <p class="text-[11px] text-slate-500 line-clamp-2">${safeSummary}</p>
+      <div class="flex flex-wrap gap-1 text-[10px] text-slate-400">${tags}</div>`;
     el.newsStrip.appendChild(card);
   });
   startNewsAutoScroll();
