@@ -126,6 +126,49 @@
     }
     .theme-light .sparkline.negative::after { background: linear-gradient(135deg, rgba(248,113,113,0.9), rgba(249,115,22,0.85)); }
 
+    .alloc-pie {
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      background: conic-gradient(var(--alloc-color, #22c55e) calc(var(--alloc, 0) * 1%), rgba(148,163,184,0.2) 0);
+      box-shadow: inset 0 0 0 1px rgba(148,163,184,0.25);
+      position: relative;
+    }
+    .alloc-pie::after {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.9);
+      box-shadow: inset 0 0 0 1px rgba(148,163,184,0.25);
+    }
+    .theme-light .alloc-pie::after {
+      background: rgba(255,255,255,0.94);
+      box-shadow: inset 0 0 0 1px rgba(148,163,184,0.35);
+    }
+
+    .allocation-pie-large {
+      width: 170px;
+      height: 170px;
+      border-radius: 999px;
+      margin: 0 auto;
+      position: relative;
+      box-shadow: inset 0 0 0 1px rgba(148,163,184,0.25), 0 12px 32px rgba(0,0,0,0.25);
+      background: conic-gradient(#1f2937 0deg, #1f2937 360deg);
+    }
+    .allocation-pie-large::after {
+      content: "";
+      position: absolute;
+      inset: 26px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.92);
+      box-shadow: inset 0 0 0 1px rgba(148,163,184,0.35);
+    }
+    .theme-light .allocation-pie-large::after {
+      background: rgba(255,255,255,0.94);
+      box-shadow: inset 0 0 0 1px rgba(148,163,184,0.35);
+    }
+
     .toast-modern {
       position: relative;
       border-radius: 18px;
@@ -399,7 +442,7 @@
       <section class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,1.2fr)] items-start">
 
         <!-- LEFT COLUMN -->
-        <div class="space-y-6">
+        <div class="space-y-6 order-2 lg:order-1">
 
           <!-- PRICE CHART + TA -->
           <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4">
@@ -765,14 +808,14 @@
                 </table>
               </div>
               <p id="no-holdings" class="mt-3 text-[11px] text-slate-500">
-                No positions yet. Add one in the panel on the right.
+                No positions yet. Add one in the Add position panel.
               </p>
             </div>
           </section>
         </div>
 
         <!-- RIGHT COLUMN -->
-        <div class="space-y-6">
+        <div class="space-y-6 order-1 lg:order-2">
 
           <!-- ADD / EDIT POSITION -->
           <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-5 sm:py-5">
@@ -846,10 +889,25 @@
                 Exposure
               </span>
             </header>
-            <div id="allocation-list" class="mt-3 space-y-2 text-xs sm:text-sm"></div>
-            <p id="allocation-empty" class="mt-2 text-[11px] text-slate-500">
-              Once you add assets, you'll see a simple breakdown here.
-            </p>
+            <div class="mt-3 grid gap-4 md:grid-cols-2">
+              <div>
+                <p class="text-[10px] uppercase tracking-[0.18em] text-slate-500">By asset</p>
+                <div id="allocation-list" class="mt-2 space-y-2 text-xs sm:text-sm"></div>
+                <p id="allocation-empty" class="mt-2 text-[11px] text-slate-500">
+                  Once you add assets, you'll see a simple breakdown here.
+                </p>
+              </div>
+              <div class="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-3 sm:px-4 sm:py-4">
+                <p class="text-[10px] uppercase tracking-[0.18em] text-slate-500">Portfolio split</p>
+                <div class="mt-3 flex items-center justify-center">
+                  <div id="allocation-pie" class="allocation-pie-large"></div>
+                </div>
+                <p id="allocation-pie-empty" class="mt-2 text-[11px] text-center text-slate-500">
+                  Add assets to see an aggregated pie.
+                </p>
+                <div id="allocation-pie-legend" class="mt-3 grid grid-cols-2 gap-2 text-[11px] text-slate-300"></div>
+              </div>
+            </div>
           </section>
 
           <!-- PRICE ALERTS -->
@@ -1197,6 +1255,9 @@ const el = {
   noHoldings: document.getElementById("no-holdings"),
   allocationList: document.getElementById("allocation-list"),
   allocationEmpty: document.getElementById("allocation-empty"),
+  allocationPie: document.getElementById("allocation-pie"),
+  allocationPieLegend: document.getElementById("allocation-pie-legend"),
+  allocationPieEmpty: document.getElementById("allocation-pie-empty"),
   watchlistEmpty: document.getElementById("watchlist-empty"),
   watchlistList: document.getElementById("watchlist-list"),
   priceStatus: document.getElementById("price-status"),
@@ -1290,6 +1351,11 @@ const el = {
   btMaxDD: document.getElementById("bt-maxdd"),
   btChart: document.getElementById("bt-chart")
 };
+
+const ALLOCATION_PALETTE = [
+  "#34d399", "#38bdf8", "#a78bfa", "#f97316", "#eab308",
+  "#f472b6", "#22d3ee", "#84cc16", "#f87171", "#c084fc"
+];
 
 let editingCoinId = null;
 
@@ -2547,6 +2613,8 @@ function renderHoldings(data) {
   }
   el.noHoldings.classList.add("hidden");
   holdings.forEach(h => {
+    const alloc = clamp((h.allocationPct || 0) / 100, 0, 1) * 100;
+    const allocColor = h.pnlAbs >= 0 ? "#34d399" : "#fb7185";
     const tr = document.createElement("tr");
     tr.className = "bg-slate-900/40 hover:bg-slate-900/80 transition rounded-xl";
     tr.innerHTML = `
@@ -2560,7 +2628,12 @@ function renderHoldings(data) {
       <td class="px-3 py-2 text-right font-mono">${formatCurrency(h.price)}</td>
       <td class="px-3 py-2 text-right font-mono">${formatCurrency(h.value)}</td>
       <td class="px-3 py-2 text-right font-mono ${h.pnlAbs>=0?"text-emerald-400":"text-rose-400"}">${formatCurrency(h.pnlAbs)}<br><span class="text-[11px] text-slate-400">${formatPercent(h.pnlPct)}</span></td>
-      <td class="px-3 py-2 text-right font-mono">${formatPercent(h.allocationPct)}</td>
+      <td class="px-3 py-2 text-right">
+        <div class="flex items-center justify-end gap-2">
+          <div class="alloc-pie" style="--alloc:${alloc}; --alloc-color:${allocColor};"></div>
+          <span class="font-mono text-xs sm:text-sm">${formatPercent(h.allocationPct)}</span>
+        </div>
+      </td>
       <td class="px-3 py-2 text-right">
         <div class="inline-flex gap-1">
           <button data-action="edit" data-id="${escapeHtml(h.id)}" class="px-2 py-1 text-[11px] rounded-full border border-slate-700 text-slate-200 hover:border-emerald-400">Edit</button>
@@ -2599,7 +2672,10 @@ function renderHoldings(data) {
           </div>
           <div class="rounded-lg bg-slate-950/60 border border-slate-800/70 p-2 text-right">
             <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500 mb-0.5">Alloc</p>
-            <p class="font-mono">${formatPercent(h.allocationPct)}</p>
+            <div class="flex items-center justify-end gap-2">
+              <div class="alloc-pie" style="--alloc:${alloc}; --alloc-color:${allocColor};"></div>
+              <p class="font-mono">${formatPercent(h.allocationPct)}</p>
+            </div>
           </div>
         </div>
         <div class="mt-3 flex items-center justify-between text-[11px]">
@@ -2614,11 +2690,17 @@ function renderHoldings(data) {
 function renderAllocationMini(data) {
   const holdings = data.holdings || [];
   el.allocationList.innerHTML = "";
+  if (el.allocationPieLegend) el.allocationPieLegend.innerHTML = "";
   if (!holdings.length) {
     el.allocationEmpty.classList.remove("hidden");
+    if (el.allocationPieEmpty) el.allocationPieEmpty.classList.remove("hidden");
+    if (el.allocationPie) el.allocationPie.style.background = "conic-gradient(#1f2937 0deg, #1f2937 360deg)";
     return;
   }
   el.allocationEmpty.classList.add("hidden");
+  if (el.allocationPieEmpty) el.allocationPieEmpty.classList.add("hidden");
+  let cumulative = 0;
+  const segments = [];
   holdings.forEach(h => {
     const row = document.createElement("div");
     row.innerHTML = `
@@ -2630,7 +2712,27 @@ function renderAllocationMini(data) {
         <div class="h-full rounded-full ${h.pnlAbs>=0?"bg-emerald-400":"bg-rose-400"}" style="width:${Math.min(100,h.allocationPct)}%"></div>
       </div>`;
     el.allocationList.appendChild(row);
+
+    const pct = clamp(h.allocationPct || 0, 0, 100);
+    const start = cumulative;
+    cumulative = Math.min(100, cumulative + pct);
+    const color = ALLOCATION_PALETTE[segments.length % ALLOCATION_PALETTE.length];
+    segments.push(`${color} ${start}% ${cumulative}%`);
+
+    if (el.allocationPieLegend) {
+      const legendItem = document.createElement("div");
+      legendItem.className = "flex items-center gap-2 rounded-lg border border-slate-800/80 bg-slate-900/60 px-2 py-1.5";
+      legendItem.innerHTML = `
+        <span class="inline-block h-2.5 w-2.5 rounded-full" style="background:${color}"></span>
+        <span class="font-semibold">${escapeHtml(h.symbol)}</span>
+        <span class="font-mono text-slate-400 ml-auto">${formatPercent(h.allocationPct)}</span>`;
+      el.allocationPieLegend.appendChild(legendItem);
+    }
   });
+
+  if (el.allocationPie && segments.length) {
+    el.allocationPie.style.background = `conic-gradient(${segments.join(", ")})`;
+  }
 }
 
 function renderWallets() {
