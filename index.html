@@ -452,7 +452,7 @@
               </div>
 
               <!-- Scenario Modeller -->
-              <div class="rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-3 space-y-3">
+              <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-3 space-y-3">
                 <div class="flex items-baseline justify-between gap-2">
                   <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Scenario modeller</p>
                   <span class="text-[10px] text-slate-400">Market shocks</span>
@@ -826,7 +826,9 @@ const COINS = [
 const STORAGE_KEYS = {
   portfolio: "minimal-crypto-portfolio-v2-portfolio",
   watchlist: "minimal-crypto-portfolio-v2-watchlist",
-  alerts:    "minimal-crypto-portfolio-v2-alerts"
+  alerts:    "minimal-crypto-portfolio-v2-alerts",
+  fx:        "minimal-crypto-fx-rates",
+  benchmarks:"minimal-crypto-benchmarks"
 };
 
 const CURRENCY_CONFIG = {
@@ -946,7 +948,16 @@ const el = {
   indicatorMACD: document.getElementById("indicator-macd"),
   drawToolSelect: document.getElementById("draw-tool-select"),
   drawClear: document.getElementById("draw-clear"),
-  // Sentiment
+  perfMonthPortfolio: document.getElementById("perf-month-portfolio"),
+  perfQuarterPortfolio: document.getElementById("perf-quarter-portfolio"),
+  perfYearPortfolio: document.getElementById("perf-year-portfolio"),
+  perfMonthSP: document.getElementById("perf-month-sp"),
+  perfQuarterSP: document.getElementById("perf-quarter-sp"),
+  perfYearSP: document.getElementById("perf-year-sp"),
+  perfMonthNasdaq: document.getElementById("perf-month-nasdaq"),
+  perfQuarterNasdaq: document.getElementById("perf-quarter-nasdaq"),
+  perfYearNasdaq: document.getElementById("perf-year-nasdaq"),
+  toastContainer: document.getElementById("toast-container"),
   fngValue: document.getElementById("fng-value"),
   fngLabel: document.getElementById("fng-label"),
   fngBar: document.getElementById("fng-bar"),
@@ -954,7 +965,6 @@ const el = {
   altSeason: document.getElementById("alt-season"),
   globalMcap: document.getElementById("global-mcap"),
   altMcap: document.getElementById("alt-mcap"),
-  // Backtester
   btStrategy: document.getElementById("bt-strategy"),
   btPeriod: document.getElementById("bt-period"),
   btRunBtn: document.getElementById("bt-run-btn"),
@@ -1010,7 +1020,9 @@ function defaultPortfolio() {
 }
 function loadPortfolio() {
   const data = loadJson(STORAGE_KEYS.portfolio, null);
-  if (!Array.isArray(data) || !data.length) return defaultPortfolio();
+  if (data === null) return defaultPortfolio();
+  if (!Array.isArray(data)) return [];
+  if (data.length === 0) return [];
   return data
     .map(h => {
       const meta = findCoinMeta(h.id) || findCoinMeta(String(h.symbol || "").toLowerCase());
@@ -1045,6 +1057,57 @@ function loadAlerts() {
     lastTriggered: a.lastTriggered || null
   }));
 }
+function persistPortfolio() {
+  saveJson(STORAGE_KEYS.portfolio, state.portfolio);
+}
+function persistWatchlist() {
+  saveJson(STORAGE_KEYS.watchlist, state.watchlist);
+}
+function persistAlerts() {
+  saveJson(STORAGE_KEYS.alerts, state.alerts);
+}
+function getDisplayPrice(coinId) {
+  const info = state.priceData[coinId];
+  if (!info) return null;
+  const cur = state.currency;
+  if (typeof info[cur] === "number") return info[cur];
+  if (typeof info.usd === "number") {
+    const rate = state.fxRates[cur] || 1;
+    return info.usd * rate;
+  }
+  return null;
+}
+function getDisplayChange(coinId) {
+  const info = state.priceData[coinId];
+  if (!info) return null;
+  const cur = state.currency;
+  const key = `${cur}_24h_change`;
+  if (typeof info[key] === "number") return info[key];
+  if (typeof info.usd_24h_change === "number") return info.usd_24h_change;
+  return null;
+}
+function clamp(value, min = 0, max = 1) {
+  return Math.min(max, Math.max(min, value));
+}
+function pseudoCorrelation(idA, idB) {
+  const mix = (idA + idB).split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return Math.sin(mix) * 0.9;
+}
+function seededRandom(seed) {
+    var x = Math.sin(seed++) * 10000;
+    return x - Math.floor(x);
+}
+function humanizeTimeAgo(timestamp) {
+  if (!timestamp) return "just now";
+  const diff = Date.now() - timestamp;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 function updateTrendClass(node, value) {
   if (!node) return;
   node.classList.remove("text-emerald-400", "text-emerald-300", "text-rose-400", "text-rose-300", "text-slate-300", "text-slate-400");
@@ -1065,11 +1128,9 @@ function calculatePortfolio(portfolio, priceData) {
   const detailed = portfolio.map(h => {
     const info = priceData[h.id] || {};
     const hasPrice = typeof info.usd === "number";
-    // Base prices in USD
     const priceUsd = hasPrice ? info.usd : (h.buyPrice || 0);
     const changePct = typeof info.usd_24h_change === "number" ? info.usd_24h_change : 0;
     
-    // Convert to display currency
     const price = priceUsd * rate;
     const buyPriceVal = (h.buyPrice || 0) * rate;
 
@@ -1124,9 +1185,14 @@ function generateSyntheticSeries(baseValue, points, timeframe) {
   else if (timeframe === "7d") vol = 0.035;
   else vol = 0.06;
   let v = base * (1 - vol * 0.8);
+
+  // Seed based on baseValue so it doesn't jitter on refresh
+  let seed = Math.floor(baseValue);
+
   for (let i=0;i<points;i++) {
     const drift = base * 0.0004;
-    const noise = (Math.random()-0.5)*2*vol*base;
+    // Seeded random
+    const noise = (seededRandom(seed + i) - 0.5) * 2 * vol * base;
     v = Math.max(base*0.4, v + drift + noise);
     const t = i / Math.max(points-1,1);
     series.push({ t, value: v });
@@ -1159,7 +1225,6 @@ function computeIndicators(series) {
   const result = { bb: null, rsi: null, macd: null };
   if (n < 5) return result;
 
-  // Bollinger: 20, 2
   const bbPeriod = 20, k = 2;
   const upper = Array(n).fill(null);
   const lower = Array(n).fill(null);
@@ -1182,7 +1247,6 @@ function computeIndicators(series) {
   }
   result.bb = { upper, lower, middle };
 
-  // RSI(14)
   const rsiPeriod = 14;
   const rsi = Array(n).fill(null);
   if (n > rsiPeriod) {
@@ -1209,7 +1273,6 @@ function computeIndicators(series) {
   }
   result.rsi = rsi;
 
-  // MACD(12,26,9)
   const fast=12, slow=26, signal=9;
   if (n > slow+signal) {
     const emaFast = Array(n).fill(null);
@@ -1331,7 +1394,6 @@ function drawPriceChart(canvas, series, indicators, settings) {
   }
   const range = maxP-minP || 1;
 
-  // synthetic OHLC for candles/bars
   const ohlc = series.map((p,i)=>{
     const close=p.value;
     const prev=i>0?series[i-1].value:close;
@@ -1347,7 +1409,6 @@ function drawPriceChart(canvas, series, indicators, settings) {
     return {x,y,value:p.value};
   });
 
-  // Grid bottom line
   ctx.strokeStyle = "rgba(30,64,175,0.4)";
   ctx.lineWidth = 1;
   ctx.setLineDash([4,6]);
@@ -1357,14 +1418,12 @@ function drawPriceChart(canvas, series, indicators, settings) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Price labels
   ctx.fillStyle = "rgba(148,163,184,0.8)";
   ctx.font = "10px system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
   ctx.textAlign = "right"; ctx.textBaseline = "middle";
   ctx.fillText(formatCurrency(maxP), width-4, mainTop+4);
   ctx.fillText(formatCurrency(minP), width-4, mainBottom-4);
 
-  // Bollinger Bands
   if (indicators && indicators.bb && showBB) {
     const {upper,lower,middle} = indicators.bb;
     const upPts=[], loPts=[], midPts=[];
@@ -1417,7 +1476,6 @@ function drawPriceChart(canvas, series, indicators, settings) {
     }
   }
 
-  // Price chart
   if (chartType === "line") {
     const gradLine = ctx.createLinearGradient(paddingX, mainTop, paddingX, mainBottom);
     gradLine.addColorStop(0, "rgba(56,189,248,1)");
@@ -1447,7 +1505,6 @@ function drawPriceChart(canvas, series, indicators, settings) {
       const lowY  = mainTop + (1-(bar.low-minP)/range)*mainH;
       const isUp = bar.close >= bar.open;
       const color = isUp ? "rgba(34,197,94,0.95)" : "rgba(248,113,113,0.95)";
-      // wick
       ctx.beginPath();
       ctx.moveTo(x, highY); ctx.lineTo(x, lowY);
       ctx.strokeStyle=color; ctx.lineWidth=wickWidth; ctx.stroke();
@@ -1457,7 +1514,7 @@ function drawPriceChart(canvas, series, indicators, settings) {
         ctx.beginPath();
         ctx.rect(x-halfBar, topY, barW, h);
         ctx.fillStyle=color; ctx.fill();
-      } else { // bars
+      } else {
         ctx.beginPath();
         ctx.moveTo(x-halfBar, openY); ctx.lineTo(x, openY);
         ctx.moveTo(x, closeY); ctx.lineTo(x+halfBar, closeY);
@@ -1466,13 +1523,11 @@ function drawPriceChart(canvas, series, indicators, settings) {
     });
   }
 
-  // Drawing tools
   const draw = settings.drawing || {};
   const trendlines = draw.trendlines || [];
   const fibs = draw.fibs || [];
   ctx.lineWidth=1;
 
-  // Trendlines
   trendlines.forEach(line=>{
     if (!line.p1 || !line.p2) return;
     const x1 = paddingX + line.p1.xNorm*innerW;
@@ -1485,7 +1540,6 @@ function drawPriceChart(canvas, series, indicators, settings) {
     ctx.setLineDash([4,2]); ctx.stroke(); ctx.setLineDash([]);
   });
 
-  // Fib retracements
   fibs.forEach(fib=>{
     if (!fib.top || !fib.bottom) return;
     const y1 = mainTop + fib.top.yNorm*mainH;
@@ -1505,15 +1559,12 @@ function drawPriceChart(canvas, series, indicators, settings) {
     });
   });
 
-  // Indicator panel
   if (hasIndicatorPanel && indH>20 && indTop!=null) {
     const it = indTop, ib=indBottom, ih=indH;
-    // base line
     ctx.strokeStyle="rgba(30,64,175,0.5)";
     ctx.lineWidth=1; ctx.setLineDash([4,6]);
     ctx.beginPath(); ctx.moveTo(paddingX,ib); ctx.lineTo(width-paddingX,ib); ctx.stroke(); ctx.setLineDash([]);
 
-    // RSI
     if (showRSI && indicators && indicators.rsi) {
       const rsi = indicators.rsi;
       const pts=[];
@@ -1539,7 +1590,6 @@ function drawPriceChart(canvas, series, indicators, settings) {
       }
     }
 
-    // MACD
     if (showMACD && indicators && indicators.macd) {
       const {macd,signal,hist} = indicators.macd;
       const macdVals=[], histVals=[];
@@ -1602,11 +1652,9 @@ function drawPriceChart(canvas, series, indicators, settings) {
   };
 }
 
-// --- Live index helpers (SPY / QQQ via Alpha Vantage) ---
 function computeIndexReturnsFromDaily(closes) {
   if (!closes || closes.length < 30) return { month: NaN, quarter: NaN, year: NaN };
   const lastIdx = closes.length - 1;
-  // ~22, 66, 252 trading days ≈ 1m, 3m, 1y
   const idx1M = Math.max(0, lastIdx - 22);
   const idx3M = Math.max(0, lastIdx - 66);
   const idx1Y = Math.max(0, lastIdx - 252);
@@ -1633,37 +1681,54 @@ async function fetchIndexDailyAlphaVantage(symbol, apiKey) {
 }
 
 async function fetchBenchmarks() {
-  const API_KEY = "14FXYP264JB2XC5F"; 
-  try {
-    const [spyCloses, qqqCloses] = await Promise.all([
-      fetchIndexDailyAlphaVantage("SPY", API_KEY),
-      fetchIndexDailyAlphaVantage("QQQ", API_KEY)
-    ]);
-    const spRet  = computeIndexReturnsFromDaily(spyCloses);
-    const ndqRet = computeIndexReturnsFromDaily(qqqCloses);
-
-    if (!isNaN(spRet.month)) {
-      BENCHMARK_RETURNS.month.sp    = spRet.month;
-      BENCHMARK_RETURNS.quarter.sp  = spRet.quarter;
-      BENCHMARK_RETURNS.year.sp     = spRet.year;
-    }
-    if (!isNaN(ndqRet.month)) {
-      BENCHMARK_RETURNS.month.nasdaq   = ndqRet.month;
-      BENCHMARK_RETURNS.quarter.nasdaq = ndqRet.quarter;
-      BENCHMARK_RETURNS.year.nasdaq    = ndqRet.year;
-    }
+  // Cached logic to prevent 429s
+  const cached = loadJson(STORAGE_KEYS.benchmarks, null);
+  const now = Date.now();
+  if (cached && (now - cached.timestamp < 12 * 60 * 60 * 1000)) {
+    BENCHMARK_RETURNS.month = cached.month;
+    BENCHMARK_RETURNS.quarter = cached.quarter;
+    BENCHMARK_RETURNS.year = cached.year;
     BENCHMARK_RETURNS.hasLive = true;
     const data = state.lastPortfolioData || calculatePortfolio(state.portfolio, state.priceData);
     renderBenchmarksAndScenario(data);
+    return;
+  }
+
+  const API_KEY = "14FXYP264JB2XC5F"; 
+  try {
+    const spyCloses = await fetchIndexDailyAlphaVantage("SPY", API_KEY);
+    await new Promise(r => setTimeout(r, 1500)); // Rate limit niceness
+    const qqqCloses = await fetchIndexDailyAlphaVantage("QQQ", API_KEY);
+
+    const spRet  = computeIndexReturnsFromDaily(spyCloses);
+    const ndqRet = computeIndexReturnsFromDaily(qqqCloses);
+
+    const newData = {
+        timestamp: now,
+        month: { sp: spRet.month, nasdaq: ndqRet.month },
+        quarter: { sp: spRet.quarter, nasdaq: ndqRet.quarter },
+        year: { sp: spRet.year, nasdaq: ndqRet.year }
+    };
+
+    if (!isNaN(spRet.month)) {
+      BENCHMARK_RETURNS.month = newData.month;
+      BENCHMARK_RETURNS.quarter = newData.quarter;
+      BENCHMARK_RETURNS.year = newData.year;
+      BENCHMARK_RETURNS.hasLive = true;
+      saveJson(STORAGE_KEYS.benchmarks, newData);
+      
+      const data = state.lastPortfolioData || calculatePortfolio(state.portfolio, state.priceData);
+      renderBenchmarksAndScenario(data);
+    }
   } catch (err) {
-    console.warn("Could not fetch live benchmarks, falling back to static values.", err);
+    console.warn("Benchmarks unavailable (rate limit or network), using defaults.");
+    // Silent fallback
   }
 }
 
 /* ---------------------- Sentiment ---------------------- */
 async function fetchSentiment() {
   try {
-    // Fear & Greed
     const fngRes = await fetch("https://api.alternative.me/fng/?limit=1");
     if (fngRes.ok) {
       const json = await fngRes.json();
@@ -1677,7 +1742,6 @@ async function fetchSentiment() {
         }`;
       }
     }
-    // Global (BTC Dom)
     const globRes = await fetch("https://api.coingecko.com/api/v3/global");
     if (globRes.ok) {
       const json = await globRes.json();
@@ -1688,18 +1752,15 @@ async function fetchSentiment() {
       if (el.btcDom) el.btcDom.textContent = btc.toFixed(1) + "%";
       if (el.globalMcap) el.globalMcap.textContent = "$" + (mcap / 1e12).toFixed(2) + "T";
 
-      // Alt Cap (Total - BTC - ETH)
       if (el.altMcap) {
          const altShare = 100 - btc - (eth || 0);
          const altVal = mcap * (altShare / 100);
          el.altMcap.textContent = "$" + (altVal / 1e12).toFixed(2) + "T";
       }
       
-      // Synthetic Altseason index (inverse of BTC dominance normalized approx 35-70)
       if (el.altSeason) {
-        const altIndex = Math.max(0, Math.min(100, (60 - btc) * 3.5)); // Rough heuristic
+        const altIndex = Math.max(0, Math.min(100, (60 - btc) * 3.5));
         el.altSeason.textContent = altIndex.toFixed(0);
-        // Style update safe method
         el.altSeason.classList.remove("text-emerald-400", "font-bold", "text-slate-200");
         el.altSeason.classList.add("font-mono");
         if (altIndex > 75) {
@@ -1721,10 +1782,9 @@ function runBacktest() {
   const days = parseInt(el.btPeriod.value);
   const portfolio = state.lastPortfolioData;
   
-  // Generate history
-  const startValue = 10000; // Normalize base
-  const dailyVol = 0.035; // Average crypto vol
-  const drift = 0.0005; // Slight upward drift assumption
+  const startValue = 10000;
+  const dailyVol = 0.035;
+  const drift = 0.0005;
   
   const pricePath = [startValue];
   for (let i=1; i<=days; i++) {
@@ -1732,12 +1792,10 @@ function runBacktest() {
     pricePath.push(pricePath[i-1] * (1 + change));
   }
   
-  // Apply Strategy
   const equityCurve = [startValue];
   let cash = startValue;
-  let invested = 0; // 0 or 1 (fraction)
+  let invested = 0;
   
-  // Precompute indicators
   function calcSMA(arr, period, idx) {
     if (idx < period) return null;
     let sum=0; for(let k=0; k<period; k++) sum+=arr[idx-k];
@@ -1747,10 +1805,8 @@ function runBacktest() {
   for (let i=0; i<pricePath.length; i++) {
     const price = pricePath[i];
     
-    // Compute signals
     const fast = calcSMA(pricePath, 20, i);
     const slow = calcSMA(pricePath, 50, i);
-    // RSI simplified with NaN protection
     let rsiVal = 50;
     if (i > 14) {
        let gains=0, losses=0;
@@ -1775,7 +1831,7 @@ function runBacktest() {
       if (rsiVal > 70 && invested > 0) action = "sell";
     } else if (strategy === "bollinger") {
       if (fast) {
-         if (price > fast*1.05 && invested === 0) action = "buy"; // breakout
+         if (price > fast*1.05 && invested === 0) action = "buy";
          if (price < fast*0.95 && invested > 0) action = "sell";
       }
     }
@@ -1792,7 +1848,6 @@ function runBacktest() {
     equityCurve.push(curVal);
   }
   
-  // Metrics
   const returns = [];
   let peak = equityCurve[0];
   let maxDD = 0;
@@ -1831,6 +1886,7 @@ function runBacktest() {
 
 function drawBacktestChart(canvas, buyHold, strategy) {
   const ctx = canvas.getContext("2d");
+  if (!ctx) return;
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
   canvas.width = rect.width * dpr;
@@ -1871,7 +1927,6 @@ async function refreshPrices(opts={light:false}) {
     if (el.refreshBtn) el.refreshBtn.disabled=true;
     if (el.priceStatus) el.priceStatus.textContent="Refreshing…";
     if (el.refreshDot) el.refreshDot.classList.add("bg-emerald-300","animate-pulse");
-
     const idsSet = new Set();
     state.portfolio.forEach(h=>idsSet.add(h.id));
     state.watchlist.forEach(id=>idsSet.add(id));
@@ -1889,93 +1944,729 @@ async function refreshPrices(opts={light:false}) {
       return;
     }
 
-    // 1. Update FX Rates (Live from ExchangeRate-API for robustness)
-    try {
-      const fxRes = await fetch("https://api.exchangerate-api.com/v4/latest/USD");
-      if (fxRes.ok) {
-        const fxJson = await fxRes.json();
-        Object.keys(fxJson.rates).forEach(code => {
-          const lower = code.toLowerCase();
-          if (state.fxRates[lower] !== undefined) {
-            state.fxRates[lower] = fxJson.rates[code];
-          }
-        });
-      }
-    } catch (e) { console.warn("FX fetch failed, using cache", e); }
-
-    // 2. Chunk CoinGecko Requests (Max 50 IDs per call to avoid 414 URI Too Long)
-    const chunkSize = 50;
-    const chunks = [];
-    for (let i = 0; i < ids.length; i += chunkSize) {
-      chunks.push(ids.slice(i, i + chunkSize));
-    }
-
-    const responses = await Promise.all(chunks.map(async (chunk) => {
-      // Only fetch USD to save API complexity/limits. We convert locally.
-      const url = `https://api.coingecko.com/api/v3/simple/price?vs_currencies=usd&include_24hr_change=true&ids=${chunk.map(encodeURIComponent).join(",")}`;
-      try {
-        const r = await fetch(url);
-        if (!r.ok) throw new Error(r.status);
-        return await r.json();
-      } catch (e) {
-        console.warn("Chunk fetch failed", e);
-        return {};
-      }
-    }));
-
-    // Merge chunks
-    let combinedData = {};
-    responses.forEach(r => { combinedData = { ...combinedData, ...r }; });
-
-    // 3. Post-process: Synthesize other currencies from USD + FX Rates
-    Object.keys(combinedData).forEach(id => {
-      const usdInfo = combinedData[id];
-      if (!usdInfo) return;
-      
-      // Fill in eur, gbp, etc.
-      Object.keys(state.fxRates).forEach(code => {
-        if (code === 'usd') return;
-        const rate = state.fxRates[code];
-        if (usdInfo.usd !== undefined) {
-          usdInfo[code] = usdInfo.usd * rate;
-        }
-        if (usdInfo.usd_24h_change !== undefined) {
-          usdInfo[`${code}_24h_change`] = usdInfo.usd_24h_change;
-        }
+    const vsCurrencies = Object.keys(CURRENCY_CONFIG).join(",");
+    const url = `https://api.coingecko.com/api/v3/simple/price?vs_currencies=${vsCurrencies}&include_24hr_change=true&ids=`+ids.map(encodeURIComponent).join(",");
+    
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Price error "+res.status);
+    const data = await res.json();
+    
+    if (data.tether) {
+      const t = data.tether;
+      const usdVal = t.usd || 1;
+      Object.keys(CURRENCY_CONFIG).forEach(k => {
+         if (t[k]) state.fxRates[k] = t[k] / usdVal;
       });
-    });
-
-    state.priceData = combinedData;
-
+      // Save FX to local storage so it doesn't reset on reload
+      saveJson(STORAGE_KEYS.fx, state.fxRates);
+    }
+    
+    state.priceData = data || {};
     const now = new Date();
     if (el.lastUpdated) el.lastUpdated.textContent = now.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
     if (el.priceStatus) el.priceStatus.textContent="Live prices";
-    
-    const portfolioData = calculatePortfolio(state.portfolio, state.priceData);
-    state.lastPortfolioData = portfolioData;
+    const portfolioData = calculatePortfolio(state.portfolio,state.priceData);
+    state.lastPortfolioData=portfolioData;
     renderAll();
     checkAlerts();
-
   } catch (err) {
     console.warn(err);
     if (el.priceStatus) el.priceStatus.textContent="Price error";
-    showToast("Network error refreshing prices.", "error");
+    showToast("Could not refresh prices. Try again shortly.","error");
   } finally {
     if (el.refreshBtn) el.refreshBtn.disabled=false;
     if (el.refreshDot) el.refreshDot.classList.remove("animate-pulse");
   }
 }
 
+/* ---------------------- Rendering helpers ---------------------- */
+function renderSummary(data) {
+  if (!data || !data.totals) return;
+  const { totals, best, worst } = data;
+  el.totalValue.textContent = formatCurrency(totals.totalValue);
+  el.totalCost.textContent = formatCurrency(totals.totalCost);
+  el.totalPnl.textContent = formatCurrency(totals.totalPnlAbs);
+  el.totalPnlPct.textContent = totals.totalPnlPct ? formatPercent(totals.totalPnlPct) : "";
+  updateTrendClass(el.totalPnl, totals.totalPnlAbs);
+  updateTrendClass(el.totalPnlPct, totals.totalPnlPct);
+  el.assetsCount.textContent = data.holdings.length;
+  el.dayPnl.textContent = formatCurrency(totals.dayChangeAbs);
+  el.dayPnlPct.textContent = formatPercent(totals.dayChangePct);
+  updateTrendClass(el.dayPnl, totals.dayChangeAbs);
+  updateTrendClass(el.dayPnlPct, totals.dayChangePct);
+  el.bestName.textContent = best ? `${best.symbol} · ${best.name}` : "--";
+  el.bestChange.textContent = best ? formatPercent(best.change24hPct) : "--";
+  el.worstName.textContent = worst ? `${worst.symbol} · ${worst.name}` : "--";
+  el.worstChange.textContent = worst ? formatPercent(worst.change24hPct) : "--";
+  updateTrendClass(el.bestChange, best ? best.change24hPct : 0);
+  updateTrendClass(el.worstChange, worst ? worst.change24hPct : 0);
+}
+
+function renderHoldings(data) {
+  const holdings = data.holdings || [];
+  el.holdingsBody.innerHTML = "";
+  if (!holdings.length) {
+    el.noHoldings.classList.remove("hidden");
+    return;
+  }
+  el.noHoldings.classList.add("hidden");
+  holdings.forEach(h => {
+    const tr = document.createElement("tr");
+    tr.className = "bg-slate-900/40 hover:bg-slate-900/80 transition rounded-xl";
+    tr.innerHTML = `
+      <td class="px-3 py-2">
+        <div class="flex flex-col">
+          <span class="font-semibold">${h.symbol}</span>
+          <span class="text-[11px] text-slate-400">${h.name}</span>
+        </div>
+      </td>
+      <td class="px-3 py-2 text-right font-mono">${h.amount.toFixed(6).replace(/\.0+$/, "")}</td>
+      <td class="px-3 py-2 text-right font-mono">${formatCurrency(h.price)}</td>
+      <td class="px-3 py-2 text-right font-mono">${formatCurrency(h.value)}</td>
+      <td class="px-3 py-2 text-right font-mono ${h.pnlAbs>=0?"text-emerald-400":"text-rose-400"}">${formatCurrency(h.pnlAbs)}<br><span class="text-[11px] text-slate-400">${formatPercent(h.pnlPct)}</span></td>
+      <td class="px-3 py-2 text-right font-mono">${formatPercent(h.allocationPct)}</td>
+      <td class="px-3 py-2 text-right">
+        <div class="inline-flex gap-1">
+          <button data-action="edit" data-id="${h.id}" class="px-2 py-1 text-[11px] rounded-full border border-slate-700 text-slate-200 hover:border-emerald-400">Edit</button>
+          <button data-action="delete" data-id="${h.id}" class="px-2 py-1 text-[11px] rounded-full border border-slate-700 text-slate-300 hover:border-rose-400">Remove</button>
+        </div>
+      </td>`;
+    el.holdingsBody.appendChild(tr);
+  });
+}
+
+function renderAllocationMini(data) {
+  const holdings = data.holdings || [];
+  el.allocationList.innerHTML = "";
+  if (!holdings.length) {
+    el.allocationEmpty.classList.remove("hidden");
+    return;
+  }
+  el.allocationEmpty.classList.add("hidden");
+  holdings.forEach(h => {
+    const row = document.createElement("div");
+    row.innerHTML = `
+      <div class="flex items-center justify-between text-xs">
+        <span class="font-semibold">${h.symbol}</span>
+        <span class="font-mono text-slate-300">${formatPercent(h.allocationPct)}</span>
+      </div>
+      <div class="mt-1 h-2 rounded-full bg-slate-800 overflow-hidden">
+        <div class="h-full rounded-full ${h.pnlAbs>=0?"bg-emerald-400":"bg-rose-400"}" style="width:${Math.min(100,h.allocationPct)}%"></div>
+      </div>`;
+    el.allocationList.appendChild(row);
+  });
+}
+
+function renderWatchlist() {
+  el.watchlistList.innerHTML = "";
+  if (!state.watchlist.length) {
+    el.watchlistEmpty.classList.remove("hidden");
+    return;
+  }
+  el.watchlistEmpty.classList.add("hidden");
+  state.watchlist.forEach(id => {
+    const meta = findCoinMeta(id) || { symbol: id.toUpperCase(), name: id };
+    const price = getDisplayPrice(id);
+    const change = getDisplayChange(id);
+    const li = document.createElement("li");
+    li.className = "rounded-xl border border-slate-800 bg-slate-900/50 px-3 py-2 flex items-center justify-between gap-3";
+    li.innerHTML = `
+      <div>
+        <p class="font-semibold">${meta.symbol}</p>
+        <p class="text-[11px] text-slate-500">${meta.name}</p>
+      </div>
+      <div class="text-right">
+        <p class="font-mono">${price!=null?formatCurrency(price):"--"}</p>
+        <p class="text-[11px] ${change>=0?"text-emerald-400":"text-rose-400"}">${change!=null?formatPercent(change):"--"}</p>
+      </div>
+      <button data-id="${id}" class="watchlist-remove text-[11px] text-slate-400 hover:text-rose-400">Remove</button>`;
+    el.watchlistList.appendChild(li);
+  });
+}
+
+function renderChartSection(data) {
+  const totals = data?.totals || {};
+  const series = totals.totalValue ? ensureChartSeries(state.timeframe, totals.totalValue) : [];
+  const indicators = computeIndicators(series);
+  if (!series.length) {
+    if (el.chartEmpty) el.chartEmpty.classList.remove("hidden");
+    if (el.chartCanvas) {
+      const ctx = el.chartCanvas.getContext("2d");
+      ctx && ctx.clearRect(0,0,el.chartCanvas.width, el.chartCanvas.height);
+    }
+  } else {
+    el.chartEmpty.classList.add("hidden");
+    drawPriceChart(el.chartCanvas, series, indicators, state.chartSettings);
+  }
+  document.querySelectorAll(".timeframe-btn").forEach(btn => {
+    if (btn.dataset.timeframe === state.timeframe) {
+      btn.classList.add("bg-slate-800","text-slate-100","shadow-[0_0_0_1px_rgba(148,163,184,0.55)]");
+    } else {
+      btn.classList.remove("bg-slate-800","text-slate-100","shadow-[0_0_0_1px_rgba(148,163,184,0.55)]");
+      btn.classList.add("text-slate-400");
+    }
+  });
+  document.querySelectorAll(".chart-type-btn").forEach(btn => {
+    if (btn.dataset.chartType === state.chartSettings.chartType) {
+      btn.classList.add("bg-slate-800","text-slate-100","shadow-[0_0_0_1px_rgba(148,163,184,0.55)]");
+    } else {
+      btn.classList.remove("bg-slate-800","text-slate-100","shadow-[0_0_0_1px_rgba(148,163,184,0.55)]");
+      btn.classList.add("text-slate-400");
+    }
+  });
+}
+
+function renderRiskMetrics(data) {
+  const totals = data?.totals || {};
+  const baseSeries = totals.totalValue ? ensureChartSeries("30d", totals.totalValue) : [];
+  const metrics = computeSeriesMetrics(baseSeries);
+  el.metricAnnualized.textContent = isFinite(metrics.annualizedReturn) ? formatPercent(metrics.annualizedReturn*100) : "--";
+  el.metricVolatility.textContent = isFinite(metrics.volatility) ? formatPercent(metrics.volatility*100) : "--";
+  el.metricSharpe.textContent = isFinite(metrics.sharpe) ? metrics.sharpe.toFixed(2) : "--";
+  el.metricMaxDD.textContent = isFinite(metrics.maxDrawdown) ? formatPercent(metrics.maxDrawdown*100) : "--";
+  updateTrendClass(el.metricSharpe, metrics.sharpe);
+
+  const dailyVol = isFinite(metrics.volatility) ? metrics.volatility / Math.sqrt(252) : 0;
+  const oneDayVar = totals.totalValue * dailyVol * 1.65;
+  const fiveDayVar = totals.totalValue * dailyVol * Math.sqrt(5) * 1.65;
+  el.metricVaR1d.textContent = totals.totalValue ? `-${formatCurrency(Math.abs(oneDayVar))}` : "--";
+  el.metricVaR1dPct.textContent = totals.totalValue ? `-${formatPercent(dailyVol*1.65*100)}` : "--";
+  el.metricVaR5d.textContent = totals.totalValue ? `-${formatCurrency(Math.abs(fiveDayVar))}` : "--";
+
+  updateStressSummary(data, parseFloat(el.riskStressSelect.value || "-0.25"));
+
+  if (data.holdings.length < 2) {
+    el.riskCorrGrid.innerHTML = '<p class="text-[10px] text-slate-500">Add at least two assets to see simulated correlations.</p>';
+    return;
+  }
+  const top = data.holdings.slice(0,4);
+  const header = ['<div class="grid" style="grid-template-columns: repeat('+(top.length+1)+', minmax(0,1fr)); gap:4px; font-size:10px;">'];
+  header.push('<div></div>');
+  top.forEach(h => header.push(`<div class="text-center text-slate-400">${h.symbol}</div>`));
+  top.forEach(a => {
+    header.push(`<div class="text-slate-400">${a.symbol}</div>`);
+    top.forEach(b => {
+      const val = a.id === b.id ? 1 : pseudoCorrelation(a.id, b.id);
+      const pct = formatPercent(val*100);
+      header.push(`<div class="text-center font-mono ${val>=0?"text-emerald-300":"text-rose-300"}">${pct}</div>`);
+    });
+  });
+  header.push('</div>');
+  el.riskCorrGrid.innerHTML = header.join("");
+}
+
+function renderBenchmarksAndScenario(data) {
+  const totals = data?.totals || {};
+  const monthSeries = totals.totalValue ? ensureChartSeries("30d", totals.totalValue) : [];
+  let monthRet = 0;
+  if (monthSeries.length >= 2) {
+    const first = monthSeries[0].value;
+    const last = monthSeries[monthSeries.length-1].value;
+    if (first > 0) monthRet = (last - first) / first;
+  }
+  const quarterRet = monthRet * 3;
+  const yearRet = monthRet * 12;
+  el.perfMonthPortfolio.textContent = totals.totalValue ? formatPercent(monthRet*100) : "--";
+  el.perfQuarterPortfolio.textContent = totals.totalValue ? formatPercent(quarterRet*100) : "--";
+  el.perfYearPortfolio.textContent = totals.totalValue ? formatPercent(yearRet*100) : "--";
+
+  el.perfMonthSP.textContent = formatPercent(BENCHMARK_RETURNS.month.sp*100);
+  el.perfQuarterSP.textContent = formatPercent(BENCHMARK_RETURNS.quarter.sp*100);
+  el.perfYearSP.textContent = formatPercent(BENCHMARK_RETURNS.year.sp*100);
+  el.perfMonthNasdaq.textContent = formatPercent(BENCHMARK_RETURNS.month.nasdaq*100);
+  el.perfQuarterNasdaq.textContent = formatPercent(BENCHMARK_RETURNS.quarter.nasdaq*100);
+  el.perfYearNasdaq.textContent = formatPercent(BENCHMARK_RETURNS.year.nasdaq*100);
+  if (!BENCHMARK_RETURNS.hasLive) {
+    el.perfMonthSP.classList.add("text-slate-400");
+    el.perfMonthNasdaq.classList.add("text-slate-400");
+  }
+}
+
+function renderAlerts() {
+  el.alertsList.innerHTML = "";
+  if (!state.alerts.length) {
+    el.alertsEmpty.classList.remove("hidden");
+    return;
+  }
+  el.alertsEmpty.classList.add("hidden");
+  state.alerts.forEach(alert => {
+    const li = document.createElement("li");
+    li.className = "rounded-xl border border-slate-800 bg-slate-900/40 px-3 py-2 flex items-center justify-between gap-3";
+    li.innerHTML = `
+      <div>
+        <p class="font-semibold text-sm">${alert.symbol || alert.coinId}</p>
+        <p class="text-[11px] text-slate-500">${alert.direction === "above" ? "≥" : "≤"} ${formatCurrency(alert.target)}</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button data-action="toggle" data-id="${alert.id}" class="text-[11px] ${alert.active?"text-emerald-400":"text-slate-500"}">${alert.active?"Active":"Paused"}</button>
+        <button data-action="delete" data-id="${alert.id}" class="text-[11px] text-slate-400 hover:text-rose-400">Remove</button>
+      </div>`;
+    el.alertsList.appendChild(li);
+  });
+}
+
+function renderNews(isFallback = false) {
+  const news = state.news || [];
+  const filter = state.newsFilter;
+  if (!news.length) {
+    el.newsEmpty.textContent = isFallback ? "News unavailable right now." : "Loading news…";
+    el.newsEmpty.classList.remove("hidden");
+    return;
+  }
+  const filtered = filter === "all" ? news : news.filter(item => item.coins.some(c => c === filter || c === filter.toUpperCase()));
+  el.newsStrip.innerHTML = "";
+  if (!filtered.length) {
+    el.newsEmpty.textContent = "No stories for that filter.";
+    el.newsEmpty.classList.remove("hidden");
+    return;
+  }
+  el.newsEmpty.classList.add("hidden");
+  filtered.forEach(item => {
+    const card = document.createElement("article");
+    card.className = "min-w-[240px] snap-start rounded-2xl border border-slate-800 bg-slate-900/40 p-3 flex flex-col gap-2";
+    card.innerHTML = `
+      <div class="flex items-center justify-between text-[10px] text-slate-500">
+        <span>${item.source}</span>
+        <span>${humanizeTimeAgo(item.publishedAt)}</span>
+      </div>
+      <a href="${item.url}" target="_blank" rel="noopener" class="text-sm font-semibold text-slate-100 line-clamp-3 hover:text-emerald-300">${item.title}</a>
+      <p class="text-[11px] text-slate-500 line-clamp-2">${item.summary}</p>
+      <div class="flex flex-wrap gap-1 text-[10px] text-slate-400">
+        ${item.coins.slice(0,3).map(tag => `<span class="px-1.5 py-0.5 rounded-full bg-slate-800/70">${tag}</span>`).join("")}
+      </div>`;
+    el.newsStrip.appendChild(card);
+  });
+  startNewsAutoScroll();
+}
+
+/* ---------------------- Event handlers ---------------------- */
+function populateSelects(searchTerm = "") {
+  const term = searchTerm.trim().toLowerCase();
+  let list = COINS;
+  if (term) {
+    list = COINS.filter(c => c.name.toLowerCase().includes(term) || c.symbol.toLowerCase().includes(term));
+  }
+  const assetOptions = list.slice(0, 150);
+  const current = el.assetSelect.value;
+  el.assetSelect.innerHTML = assetOptions.map(c => `<option value="${c.id}">${c.symbol} · ${c.name}</option>`).join("");
+  if (current && assetOptions.every(o => o.id !== current)) {
+    const existing = findCoinMeta(current);
+    if (existing) {
+      const opt = document.createElement("option");
+      opt.value = existing.id;
+      opt.textContent = `${existing.symbol} · ${existing.name}`;
+      el.assetSelect.prepend(opt);
+    }
+  }
+  if (current) el.assetSelect.value = current;
+
+  el.watchlistSelect.innerHTML = COINS.slice(0, 200).map(c => `<option value="${c.id}">${c.symbol} · ${c.name}</option>`).join("");
+  el.alertsAsset.innerHTML = COINS.map(c => `<option value="${c.id}">${c.symbol} · ${c.name}</option>`).join("");
+
+  const filterSet = new Set(["all", ...state.portfolio.map(h => h.id), ...state.watchlist]);
+  el.newsCoinFilter.innerHTML = Array.from(filterSet).map(id => {
+    if (id === "all") return '<option value="all">All</option>';
+    const meta = findCoinMeta(id) || { symbol: id.toUpperCase(), name: id };
+    return `<option value="${id}">${meta.symbol}</option>`;
+  }).join("");
+  el.newsCoinFilter.value = filterSet.has(state.newsFilter) ? state.newsFilter : "all";
+}
+
+function handleTimeframeClick(e) {
+  const timeframe = e.currentTarget.dataset.timeframe;
+  if (!timeframe || timeframe === state.timeframe) return;
+  state.timeframe = timeframe;
+  renderChartSection(state.lastPortfolioData || calculatePortfolio(state.portfolio, state.priceData));
+}
+
+function handleChartTypeClick(e) {
+  const chartType = e.currentTarget.dataset.chartType;
+  if (!chartType || chartType === state.chartSettings.chartType) return;
+  state.chartSettings.chartType = chartType;
+  renderChartSection(state.lastPortfolioData || calculatePortfolio(state.portfolio, state.priceData));
+}
+
+function handleAssetForm(event) {
+  event.preventDefault();
+  const coinId = el.assetSelect.value;
+  const amount = parseFloat(el.assetAmount.value);
+  if (!coinId || !isFinite(amount) || amount <= 0) {
+    el.assetFormError.textContent = "Select an asset and enter a valid amount.";
+    el.assetFormError.classList.remove("hidden");
+    return;
+  }
+  el.assetFormError.classList.add("hidden");
+  const buyPriceInput = parseFloat(el.assetBuyPrice.value);
+  const entryCur = el.assetEntryCurrency.value || "usd";
+  const fx = state.fxRates[entryCur] || 1;
+  const buyPriceUsd = isFinite(buyPriceInput) && buyPriceInput > 0 ? buyPriceInput / fx : 0;
+  const meta = findCoinMeta(coinId) || { id: coinId, symbol: coinId.toUpperCase(), name: coinId };
+  const existingIndex = state.portfolio.findIndex(h => h.id === coinId);
+  if (editingCoinId && existingIndex >= 0 && editingCoinId !== coinId) {
+    showToast("Cannot change to a new asset while editing. Remove and add again.", "warn");
+    return;
+  }
+  if (editingCoinId) {
+    const idx = state.portfolio.findIndex(h => h.id === editingCoinId);
+    if (idx >= 0) {
+      state.portfolio[idx].amount = amount;
+      state.portfolio[idx].buyPrice = buyPriceUsd;
+    }
+    showToast("Position updated", "success");
+  } else if (existingIndex >= 0) {
+    const holding = state.portfolio[existingIndex];
+    const totalAmount = holding.amount + amount;
+    const newCost = (holding.buyPrice * holding.amount + (buyPriceUsd || holding.buyPrice) * amount) / totalAmount;
+    holding.amount = totalAmount;
+    holding.buyPrice = newCost || holding.buyPrice;
+    showToast("Position topped up", "success");
+  } else {
+    state.portfolio.push({
+      id: meta.id,
+      symbol: meta.symbol,
+      name: meta.name,
+      amount,
+      buyPrice: buyPriceUsd
+    });
+    showToast("Position added", "success");
+  }
+  persistPortfolio();
+  clearEditMode();
+  el.assetForm.reset();
+  renderAll();
+  refreshPrices({ light: true });
+}
+
+function clearEditMode() {
+  editingCoinId = null;
+  el.assetForm.reset();
+  el.assetSearch.value = "";
+  el.assetFormTitle.textContent = "Add position";
+  el.assetSubmitLabel.textContent = "Add position";
+  el.assetCancelEdit.classList.add("hidden");
+  populateSelects();
+}
+
+function handleHoldingsClick(e) {
+  const btn = e.target.closest("button[data-action]");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const action = btn.dataset.action;
+  if (!id) return;
+  const holding = state.portfolio.find(h => h.id === id);
+  if (!holding) return;
+  if (action === "edit") {
+    editingCoinId = id;
+    populateSelects();
+    el.assetSelect.value = id;
+    el.assetAmount.value = holding.amount;
+    el.assetBuyPrice.value = holding.buyPrice ? holding.buyPrice : "";
+    el.assetFormTitle.textContent = `Editing ${holding.symbol}`;
+    el.assetSubmitLabel.textContent = "Update position";
+    el.assetCancelEdit.classList.remove("hidden");
+    el.assetFormError.classList.add("hidden");
+  } else if (action === "delete") {
+    state.portfolio = state.portfolio.filter(h => h.id !== id);
+    persistPortfolio();
+    showToast(`${holding.symbol} removed`, "warn");
+    clearEditMode();
+    renderAll();
+  }
+}
+
+function handleWatchlistForm(e) {
+  e.preventDefault();
+  const id = el.watchlistSelect.value;
+  if (!id) return;
+  if (state.watchlist.includes(id)) {
+    showToast("Already on watchlist", "info");
+    return;
+  }
+  state.watchlist.push(id);
+  persistWatchlist();
+  renderWatchlist();
+  populateSelects(el.assetSearch.value);
+  showToast("Watchlist updated", "success");
+}
+
+function handleWatchlistClick(e) {
+  const btn = e.target.closest("button.watchlist-remove");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  state.watchlist = state.watchlist.filter(item => item !== id);
+  persistWatchlist();
+  renderWatchlist();
+  populateSelects(el.assetSearch.value);
+}
+
+function handleAlertsForm(e) {
+  e.preventDefault();
+  const coinId = el.alertsAsset.value;
+  const direction = el.alertsDirection.value;
+  const target = parseFloat(el.alertsPrice.value);
+  if (!coinId || !isFinite(target) || target <= 0) {
+    showToast("Enter a valid alert target", "error");
+    return;
+  }
+  const meta = findCoinMeta(coinId) || { symbol: coinId.toUpperCase(), name: coinId };
+  state.alerts.push({
+    id: String(Date.now()),
+    coinId,
+    symbol: meta.symbol,
+    name: meta.name,
+    direction,
+    target,
+    repeat: el.alertsRepeat.checked,
+    active: true,
+    lastTriggered: null
+  });
+  persistAlerts();
+  el.alertsForm.reset();
+  renderAlerts();
+  showToast("Alert added", "success");
+}
+
+function handleAlertsListClick(e) {
+  const btn = e.target.closest("button[data-action]");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const alert = state.alerts.find(a => a.id === id);
+  if (!alert) return;
+  if (btn.dataset.action === "toggle") {
+    alert.active = !alert.active;
+    showToast(`Alert ${alert.active?"resumed":"paused"}`, "info");
+  } else if (btn.dataset.action === "delete") {
+    state.alerts = state.alerts.filter(a => a.id !== id);
+    showToast("Alert deleted", "warn");
+  }
+  persistAlerts();
+  renderAlerts();
+}
+
+function handleNewsFilter(e) {
+  state.newsFilter = e.target.value;
+  renderNews();
+}
+
+function handleIndicatorToggle() {
+  state.chartSettings.indicators.bb = el.indicatorBB.checked;
+  state.chartSettings.indicators.rsi = el.indicatorRSI.checked;
+  state.chartSettings.indicators.macd = el.indicatorMACD.checked;
+  renderChartSection(state.lastPortfolioData || calculatePortfolio(state.portfolio, state.priceData));
+}
+
+function handleDrawToolChange(e) {
+  state.chartSettings.drawing.tool = e.target.value;
+  state.chartSettings.drawing.pending = null;
+  showToast(state.chartSettings.drawing.tool === "none" ? "Drawing disabled" : `Drawing ${state.chartSettings.drawing.tool}`, "info");
+}
+
+function handleDrawClear() {
+  state.chartSettings.drawing.trendlines = [];
+  state.chartSettings.drawing.fibs = [];
+  state.chartSettings.drawing.pending = null;
+  renderChartSection(state.lastPortfolioData || calculatePortfolio(state.portfolio, state.priceData));
+  showToast("Drawing overlays cleared", "success");
+}
+
+function handleChartClick(e) {
+  const tool = state.chartSettings.drawing.tool;
+  if (tool === "none" || !chartLayout) return;
+  const rect = el.chartCanvas.getBoundingClientRect();
+  const xNorm = clamp((e.clientX - rect.left - chartLayout.paddingX) / chartLayout.innerWidth);
+  const yNorm = clamp((e.clientY - rect.top - chartLayout.mainTop) / chartLayout.mainHeight);
+  if (!state.chartSettings.drawing.pending) {
+    state.chartSettings.drawing.pending = { type: tool, first: { xNorm, yNorm } };
+    showToast("First point locked. Click again to finish.", "info");
+    return;
+  }
+  const pending = state.chartSettings.drawing.pending;
+  if (pending.type !== tool) {
+    state.chartSettings.drawing.pending = { type: tool, first: { xNorm, yNorm } };
+    return;
+  }
+  if (tool === "trendline") {
+    state.chartSettings.drawing.trendlines.push({ p1: pending.first, p2: { xNorm, yNorm } });
+  } else if (tool === "fib") {
+    state.chartSettings.drawing.fibs.push({ top: pending.first, bottom: { xNorm, yNorm } });
+  }
+  state.chartSettings.drawing.pending = null;
+  renderChartSection(state.lastPortfolioData || calculatePortfolio(state.portfolio, state.priceData));
+}
+
+function handleScenarioSubmit(e) {
+  e.preventDefault();
+  const base = state.lastPortfolioData?.totals?.totalValue || 0;
+  if (!base) {
+    showToast("Add holdings to run scenarios.", "warn");
+    return;
+  }
+  const extra = parseFloat(el.scenarioAmount.value) || 0;
+  const move = parseFloat(el.scenarioMove.value) || 0;
+  const future = (base + extra) * (1 + move);
+  const pnl = future - base;
+  el.scenarioResultValue.textContent = formatCurrency(future);
+  el.scenarioResultPnl.textContent = formatCurrency(pnl);
+  updateTrendClass(el.scenarioResultPnl, pnl);
+  el.scenarioNote.textContent = `Shock ${formatPercent(move*100)} applied to current holdings plus extra capital.`;
+}
+
+function updateStressSummary(data, shock) {
+  if (!data || !data.totals || !data.totals.totalValue) {
+    el.riskStressSummary.textContent = "Add holdings to see crash impact.";
+    return;
+  }
+  const base = data.totals.totalValue;
+  const future = base * (1 + shock);
+  const delta = future - base;
+  el.riskStressLabel.textContent = formatPercent(shock*100);
+  el.riskStressSummary.textContent = `${formatCurrency(future)} (${delta>=0?"+":""}${formatCurrency(delta).replace("$","$")})`;
+  updateTrendClass(el.riskStressSummary, delta);
+}
+
+function checkAlerts() {
+  if (!state.alerts.length) return;
+  let triggered = false;
+  state.alerts.forEach(alert => {
+    if (!alert.active) return;
+    const price = getDisplayPrice(alert.coinId);
+    if (price == null) return;
+    if (alert.direction === "above" && price >= alert.target) {
+      triggered = true;
+      alert.lastTriggered = Date.now();
+      if (!alert.repeat) alert.active = false;
+      showToast(`${alert.symbol} hit ≥ ${formatCurrency(alert.target)}`, "success");
+      playAlertTone();
+    }
+    if (alert.direction === "below" && price <= alert.target) {
+      triggered = true;
+      alert.lastTriggered = Date.now();
+      if (!alert.repeat) alert.active = false;
+      showToast(`${alert.symbol} hit ≤ ${formatCurrency(alert.target)}`, "warn");
+      playAlertTone();
+    }
+  });
+  if (triggered) {
+    persistAlerts();
+    renderAlerts();
+  }
+}
+
+function showToast(message, type = "info") {
+  if (!el.toastContainer) return;
+  const toast = document.createElement("div");
+  const colors = {
+    success: "bg-emerald-500/20 border-emerald-400 text-emerald-100",
+    error: "bg-rose-500/20 border-rose-400 text-rose-100",
+    warn: "bg-amber-500/20 border-amber-400 text-amber-100",
+    info: "bg-slate-800/80 border-slate-600 text-slate-100"
+  };
+  toast.className = `px-3 py-2 rounded-xl border text-sm shadow-lg ${colors[type] || colors.info}`;
+  toast.textContent = message;
+  el.toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add("opacity-0", "translate-y-2", "transition-all");
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+}
+
+function unlockAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+}
+
+function ensureAudioContext() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playAlertTone() {
+  const ctx = ensureAudioContext();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.frequency.value = 880;
+  gain.gain.setValueAtTime(0.001, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + 0.4);
+}
+
+function startNewsAutoScroll() {
+  if (state.newsAutoScrollTimer) clearInterval(state.newsAutoScrollTimer);
+  if (!el.newsStrip) return;
+  state.newsAutoScrollTimer = setInterval(() => {
+    if (!el.newsStrip) return;
+    if (el.newsStrip.scrollWidth <= el.newsStrip.clientWidth) return;
+    const atEnd = Math.abs(el.newsStrip.scrollWidth - el.newsStrip.clientWidth - el.newsStrip.scrollLeft) < 4;
+    if (atEnd) {
+      el.newsStrip.scrollTo({ left: 0, behavior: "smooth" });
+    } else {
+      el.newsStrip.scrollBy({ left: 240, behavior: "smooth" });
+    }
+  }, 6000);
+}
+
+function fetchNewsFallback() {
+  state.news = [
+    {
+      id: "fallback-1",
+      title: "Crypto markets consolidate ahead of macro data",
+      url: "https://news.example.com/market",
+      source: "Fallback",
+      summary: "Key majors hold support while traders watch liquidity across L2 ecosystems.",
+      publishedAt: Date.now() - 3600000,
+      coins: ["BTC","ETH","SOL"]
+    },
+    {
+      id: "fallback-2",
+      title: "Layer 2 growth sparks optimism",
+      url: "https://news.example.com/l2",
+      source: "Fallback",
+      summary: "Bridge flows into Base, Blast and Mantle continue to climb with healthy fees.",
+      publishedAt: Date.now() - 7200000,
+      coins: ["BASE","BLAST","MNT"]
+    }
+  ];
+  renderNews(true);
+}
+
+async function fetchNews() {
+  try {
+    const res = await fetch("https://min-api.cryptocompare.com/data/v2/news/?lang=EN");
+    if (!res.ok) throw new Error("News error " + res.status);
+    const json = await res.json();
+    if (!Array.isArray(json.Data)) throw new Error("Bad news payload");
+    state.news = json.Data.slice(0, 25).map(item => ({
+      id: item.id,
+      title: item.title,
+      url: item.url,
+      source: item.source_info?.name || item.source || "CryptoCompare",
+      summary: item.body?.slice(0, 140) || "",
+      publishedAt: (item.published_on || 0) * 1000,
+      coins: (item.tags || "BTC").split("|").map(tag => tag.trim().toUpperCase()).filter(Boolean)
+    }));
+    renderNews();
+  } catch (err) {
+    console.warn("News fetch failed", err);
+    showToast("News feed unavailable", "warn");
+    fetchNewsFallback();
+  }
+}
+
 /* ---------------------- All-in render ---------------------- */
 function renderAll() {
-  const data = calculatePortfolio(state.portfolio, state.priceData);
+  const data = state.lastPortfolioData || calculatePortfolio(state.portfolio, state.priceData);
   state.lastPortfolioData = data;
-  
-  // Ensure 30d series exists for benchmarks even if chart is hidden
   if (data.totals.totalValue) {
      ensureChartSeries("30d", data.totals.totalValue);
   }
-
   renderSummary(data);
   renderHoldings(data);
   renderAllocationMini(data);
@@ -1991,13 +2682,16 @@ function init() {
   state.portfolio = loadPortfolio();
   state.watchlist = loadWatchlist();
   state.alerts    = loadAlerts();
+  
+  // Load persistent FX rates
+  const savedFx = loadJson(STORAGE_KEYS.fx, null);
+  if (savedFx) state.fxRates = savedFx;
 
   populateSelects();
   const data = calculatePortfolio(state.portfolio,state.priceData);
   state.lastPortfolioData=data;
   renderAll();
 
-  // Events
   document.querySelectorAll(".timeframe-btn").forEach(btn=>{
     btn.addEventListener("click", handleTimeframeClick);
   });
@@ -2029,8 +2723,10 @@ function init() {
     const data = state.lastPortfolioData || calculatePortfolio(state.portfolio,state.priceData);
     updateStressSummary(data, parseFloat(el.riskStressSelect.value||"-0.25"));
   });
+  
+  // Unlock audio context on user interaction
+  document.addEventListener('click', unlockAudio, { once: true });
 
-  // First loads
   refreshPrices();
   fetchNews();
   fetchSentiment();
