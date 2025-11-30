@@ -3,8 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <title>Crypto Portfolio Dashboard</title>
+  <meta name="description" content="Minimal local-first crypto portfolio dashboard with live pricing, alerts, charts and scenario modelling. Data fetched from public APIs." />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="manifest" href="/site.webmanifest" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4" defer crossorigin="anonymous"></script>
   <style>
     :root { color-scheme: dark; }
     .theme-light { color-scheme: light; }
@@ -207,41 +211,41 @@
     .theme-light .text-slate-500 { color: #64748b !important; }
 
     .theme-light .bg-slate-950,
-    .theme-light .bg-slate-950\/80,
-    .theme-light .bg-slate-950\/70,
-    .theme-light .bg-slate-950\/60,
+    .theme-light .bg-slate-950/80,
+    .theme-light .bg-slate-950/70,
+    .theme-light .bg-slate-950/60,
     .theme-light .bg-slate-900,
-    .theme-light .bg-slate-900\/90,
-    .theme-light .bg-slate-900\/80,
-    .theme-light .bg-slate-900\/70,
-    .theme-light .bg-slate-900\/60,
-    .theme-light .bg-slate-900\/50,
-    .theme-light .bg-slate-900\/40,
-    .theme-light .bg-slate-900\/30,
-    .theme-light .bg-slate-800\/80,
-    .theme-light .bg-slate-800\/70,
-    .theme-light .bg-slate-800\/60,
-    .theme-light .bg-slate-800\/50,
+    .theme-light .bg-slate-900/90,
+    .theme-light .bg-slate-900/80,
+    .theme-light .bg-slate-900/70,
+    .theme-light .bg-slate-900/60,
+    .theme-light .bg-slate-900/50,
+    .theme-light .bg-slate-900/40,
+    .theme-light .bg-slate-900/30,
+    .theme-light .bg-slate-800/80,
+    .theme-light .bg-slate-800/70,
+    .theme-light .bg-slate-800/60,
+    .theme-light .bg-slate-800/50,
     .theme-light .bg-slate-700,
-    .theme-light .bg-slate-700\/50 {
+    .theme-light .bg-slate-700/50 {
       background: linear-gradient(145deg, rgba(255,255,255,0.9), rgba(226,232,240,0.76));
       border: 1px solid rgba(148,163,184,0.32);
       backdrop-filter: blur(16px) saturate(108%);
       box-shadow: 0 12px 32px rgba(15,23,42,0.14);
     }
-    .theme-light .border-slate-900\/60,
+    .theme-light .border-slate-900/60,
     .theme-light .border-slate-900,
     .theme-light .border-slate-800,
-    .theme-light .border-slate-800\/70,
-    .theme-light .border-slate-800\/60,
-    .theme-light .border-slate-800\/50,
+    .theme-light .border-slate-800/70,
+    .theme-light .border-slate-800/60,
+    .theme-light .border-slate-800/50,
     .theme-light .border-slate-700,
-    .theme-light .border-slate-700\/50,
+    .theme-light .border-slate-700/50,
     .theme-light .border-slate-600 {
       border-color: rgba(148,163,184,0.45) !important;
     }
-    .theme-light .bg-slate-800\/70 span,
-    .theme-light .bg-slate-800\/70 strong { color: inherit; }
+    .theme-light .bg-slate-800/70 span,
+    .theme-light .bg-slate-800/70 strong { color: inherit; }
 
     .theme-light input,
     .theme-light select,
@@ -307,7 +311,7 @@
         </div>
         <div class="flex flex-wrap sm:flex-nowrap items-center justify-start sm:justify-end gap-2 w-full sm:w-auto">
           <select id="global-currency-select"
-                  class="min-w-[88px] rounded-full border border-slate-700 bg-slate-900/90 px-2 py-1.5 text-[11px] font-medium text-slate-200 focus:outline-none focus:border-emerald-500/70 focus:ring-1 focus:ring-emerald-400/50">
+                  class="min-w-[88px] rounded-full border border-slate-700 bg-slate-900/90 px-2 py-1.5 text-[11px] font-medium text-slate-200 focus:outline-none focus:border-emerald-500/70 focus:[...]">
             <option value="usd" selected>USD</option>
             <option value="eur">EUR</option>
             <option value="gbp">GBP</option>
@@ -316,12 +320,12 @@
             <option value="cad">CAD</option>
           </select>
           <button id="refresh-btn"
-                  class="inline-flex items-center justify-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[11px] font-semibold hover:border-emerald-400/70 hover:text-emerald-200 transition focus-visible:ring-1 focus-visible:ring-emerald-400/40">
+                  class="inline-flex items-center justify-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[11px] font-semibold hover:border-emerald-400/70 hov[...]">
             <span id="refresh-dot" class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.9)]"></span>
             Refresh
           </button>
           <button id="theme-toggle" type="button"
-                  class="theme-toggle inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold text-slate-100 hover:border-emerald-400/70 hover:text-emerald-200 transition focus-visible:ring-1 focus-visible:ring-emerald-400/40">
+                  class="theme-toggle inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold text-slate-100 hover:border-emerald-400/70 hover:te[...]">
             <span id="theme-dot" class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.9)]"></span>
             <span id="theme-label">Dark</span>
           </button>
@@ -330,9 +334,9 @@
           <div class="relative w-44">
             <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-600">🔑</span>
             <input id="cg-api-key" type="password" placeholder="CoinGecko API key (optional)"
-                   class="w-full rounded-full border border-slate-800 bg-slate-900/80 pl-8 pr-3 py-1.5 text-[10px] text-slate-200 placeholder:text-slate-600 focus:border-emerald-400/70 focus:outline-none focus:ring-1 focus:ring-emerald-400/40" />
+                   class="w-full rounded-full border border-slate-800 bg-slate-900/80 pl-8 pr-3 py-1.5 text-[10px] text-slate-200 placeholder:text-slate-600 focus:border-emerald-400/70 focus:outl[...]
           </div>
-          <button id="cg-api-save" class="rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[10px] font-medium hover:border-emerald-400/70 hover:text-emerald-200 focus-visible:ring-1 focus-visible:ring-emerald-400/40">Save</button>
+          <button id="cg-api-save" class="rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[10px] font-medium hover:border-emerald-400/70 hover:text-emerald-200 focus-visible[...]
         </div>
       </div>
     </div>
@@ -371,7 +375,7 @@
   </div>
 
   <!-- Toasts -->
-  <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2 max-w-xs"></div>
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2 max-w-xs" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <!-- MAIN -->
   <main class="flex-1">
@@ -512,7 +516,7 @@
                 <div class="flex flex-wrap items-center gap-2">
                   <span class="uppercase tracking-[0.18em] text-slate-500">Draw</span>
                   <select id="draw-tool-select"
-                          class="rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[11px] text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+                          class="rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[11px] text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-o[...]">
                     <option value="none">None</option>
                     <option value="trendline">Trendline</option>
                     <option value="fib">Fib retracement</option>
@@ -3535,5 +3539,7 @@ function init() {
 
 document.addEventListener("DOMContentLoaded", init);
 </script>
+          <!-- ...rest of original file continues unchanged... -->
+</div>
 </body>
 </html>
