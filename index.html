@@ -56,6 +56,7 @@
         <div class="hidden sm:flex items-center gap-2 text-slate-400">
           <span class="inline-flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
           <span id="price-status">Live prices</span>
+          <span id="price-stale" class="hidden rounded-full border border-amber-500/50 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-200">Stale</span>
         </div>
         <div class="hidden sm:flex flex-col items-end text-slate-500">
           <span class="uppercase tracking-[0.16em] text-[9px]">Updated</span>
@@ -70,6 +71,11 @@
           <option value="aud">AUD</option>
           <option value="cad">CAD</option>
         </select>
+        <div class="hidden sm:flex items-center gap-2 text-[10px] text-slate-400">
+          <input id="cg-api-key" type="password" placeholder="CoinGecko API key (optional)"
+                 class="w-44 rounded-full border border-slate-800 bg-slate-900/80 px-3 py-1.5 text-[10px] text-slate-200 placeholder:text-slate-600 focus:border-emerald-400/70 focus:outline-none" />
+          <button id="cg-api-save" class="rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[10px] font-medium hover:border-emerald-400/70 hover:text-emerald-200">Save</button>
+        </div>
         <button id="refresh-btn"
                 class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[11px] font-medium hover:border-emerald-400/70 hover:text-emerald-200 transition">
           <span id="refresh-dot" class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
@@ -842,7 +848,8 @@ const STORAGE_KEYS = {
   alerts:    "minimal-crypto-portfolio-v2-alerts",
   fx:        "minimal-crypto-fx-rates",
   benchmarks:"minimal-crypto-benchmarks",
-  currency:  "minimal-crypto-preferred-currency"
+  currency:  "minimal-crypto-preferred-currency",
+  cgApiKey:  "minimal-crypto-coingecko-api-key"
 };
 
 const CURRENCY_CONFIG = {
@@ -885,7 +892,10 @@ const state = {
   newsAutoScrollIndex: 0,
   newsAutoScrollTimer: null,
   currency: "usd",
-  fxRates: { usd: 1, eur: 0.92, gbp: 0.79, jpy: 150, aud: 1.5, cad: 1.35 } // Default fallbacks
+  fxRates: { usd: 1, eur: 0.92, gbp: 0.79, jpy: 150, aud: 1.5, cad: 1.35 }, // Default fallbacks
+  priceHistory: {},
+  lastPriceSuccess: null,
+  cgApiKey: ""
 };
 
 let audioCtx = null;
@@ -980,6 +990,9 @@ const el = {
   altSeason: document.getElementById("alt-season"),
   globalMcap: document.getElementById("global-mcap"),
   altMcap: document.getElementById("alt-mcap"),
+  priceStale: document.getElementById("price-stale"),
+  cgApiKeyInput: document.getElementById("cg-api-key"),
+  cgApiSaveBtn: document.getElementById("cg-api-save"),
   btStrategy: document.getElementById("bt-strategy"),
   btPeriod: document.getElementById("bt-period"),
   btRunBtn: document.getElementById("bt-run-btn"),
@@ -1022,6 +1035,14 @@ function formatPercent(v) {
   const sign = v > 0 ? "+" : "";
   return sign + v.toFixed(2) + "%";
 }
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 function findCoinMeta(id) {
   return COINS.find(c => c.id === id) || null;
 }
@@ -1056,6 +1077,12 @@ function loadWatchlist() {
   if (!Array.isArray(data)) return [];
   const ids = [...new Set(data)].filter(id => COINS.some(c => c.id === id));
   return ids;
+}
+function loadCgApiKey() {
+  try { return localStorage.getItem(STORAGE_KEYS.cgApiKey) || ""; } catch { return ""; }
+}
+function persistCgApiKey(value) {
+  try { localStorage.setItem(STORAGE_KEYS.cgApiKey, value || ""); } catch {}
 }
 function loadAlerts() {
   const data = loadJson(STORAGE_KEYS.alerts, []);
@@ -1801,114 +1828,175 @@ async function fetchSentiment() {
 }
 
 /* ---------------------- Backtesting ---------------------- */
-function runBacktest() {
+async function fetchHistoricalPrices(ids, days) {
+  const currency = state.currency || "usd";
+  const result = {};
+  const cacheKey = `${days}-${currency}`;
+
+  for (const id of ids) {
+    if (!id) continue;
+    const cached = state.priceHistory[id]?.[cacheKey];
+    if (cached) {
+      result[id] = cached;
+      continue;
+    }
+    const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=${currency}&days=${days}&interval=daily`;
+    const res = await fetchWithRetries(url, {}, 3, 700);
+    const json = await res.json();
+    if (!Array.isArray(json.prices)) continue;
+    result[id] = json.prices;
+    state.priceHistory[id] = state.priceHistory[id] || {};
+    state.priceHistory[id][cacheKey] = json.prices;
+  }
+
+  return result;
+}
+
+async function runBacktest() {
   if (!el.btResults || !state.lastPortfolioData) return;
   el.btResults.classList.remove("hidden");
-  
+
   const strategy = el.btStrategy.value;
   const days = parseInt(el.btPeriod.value);
   const portfolio = state.lastPortfolioData;
-  
-  const startValue = 10000;
-  const dailyVol = 0.035;
-  const drift = 0.0005;
-  
-  const pricePath = [startValue];
-  for (let i=1; i<=days; i++) {
-    const change = (Math.random() + Math.random() + Math.random() - 1.5) * dailyVol + drift;
-    pricePath.push(pricePath[i-1] * (1 + change));
+  const holdings = (portfolio.holdings || []).filter(h => h.value > 0);
+  if (!holdings.length) {
+    showToast("Add holdings to run a backtest.", "warn");
+    return;
   }
-  
-  const equityCurve = [startValue];
-  let cash = startValue;
-  let invested = 0;
-  
-  function calcSMA(arr, period, idx) {
-    if (idx < period) return null;
-    let sum=0; for(let k=0; k<period; k++) sum+=arr[idx-k];
-    return sum/period;
+
+  if (el.btRunBtn) {
+    el.btRunBtn.disabled = true;
+    el.btRunBtn.textContent = "Running…";
   }
-  
-  for (let i=0; i<pricePath.length; i++) {
-    const price = pricePath[i];
-    
-    const fast = calcSMA(pricePath, 20, i);
-    const slow = calcSMA(pricePath, 50, i);
-    let rsiVal = 50;
-    if (i > 14) {
-       let gains=0, losses=0;
-       for(let k=0; k<14; k++) {
-         const d = pricePath[i-k] - pricePath[i-k-1];
-         if (d>0) gains+=d; else if (d<0) losses-=d;
-       }
-       if (losses === 0) rsiVal = 100;
-       else rsiVal = 100 - 100/(1+(gains/losses));
+
+  try {
+    const ids = holdings.map(h => h.id);
+    const history = await fetchHistoricalPrices(ids, days + 1);
+    if (!Object.keys(history).length) {
+      showToast("Historical prices unavailable.", "error");
+      return;
     }
-    
-    let action = "hold";
-    if (strategy === "hold") {
-      if (i===0) action = "buy";
-    } else if (strategy === "sma_cross") {
-      if (fast && slow) {
-        if (fast > slow && invested === 0) action = "buy";
-        if (fast < slow && invested > 0) action = "sell";
+
+    const weights = holdings.map(h => h.value / portfolio.totals.totalValue);
+    const series = holdings.map(h => history[h.id] || []);
+    const minLen = Math.min(...series.map(s => s.length));
+    if (!isFinite(minLen) || minLen < 2) {
+      showToast("Not enough history to backtest.", "warn");
+      return;
+    }
+
+    const startValue = 10000;
+    const pricePath = [];
+    for (let i = 0; i < minLen; i++) {
+      let valueNorm = 0;
+      series.forEach((s, idx) => {
+        const start = s[0][1];
+        const price = s[i][1];
+        valueNorm += weights[idx] * (price / start);
+      });
+      pricePath.push(startValue * valueNorm);
+    }
+
+    const equityCurve = [startValue];
+    let cash = startValue;
+    let invested = 0;
+
+    function calcSMA(arr, period, idx) {
+      if (idx < period) return null;
+      let sum=0; for(let k=0; k<period; k++) sum+=arr[idx-k];
+      return sum/period;
+    }
+
+    for (let i=0; i<pricePath.length; i++) {
+      const price = pricePath[i];
+
+      const fast = calcSMA(pricePath, 20, i);
+      const slow = calcSMA(pricePath, 50, i);
+      let rsiVal = 50;
+      if (i > 14) {
+         let gains=0, losses=0;
+         for(let k=0; k<14; k++) {
+           const d = pricePath[i-k] - pricePath[i-k-1];
+           if (d>0) gains+=d; else if (d<0) losses-=d;
+         }
+         if (losses === 0) rsiVal = 100;
+         else rsiVal = 100 - 100/(1+(gains/losses));
       }
-    } else if (strategy === "rsi_strat") {
-      if (rsiVal < 30 && invested === 0) action = "buy";
-      if (rsiVal > 70 && invested > 0) action = "sell";
-    } else if (strategy === "bollinger") {
-      if (fast) {
-         if (price > fast*1.05 && invested === 0) action = "buy";
-         if (price < fast*0.95 && invested > 0) action = "sell";
+
+      let action = "hold";
+      if (strategy === "hold") {
+        if (i===0) action = "buy";
+      } else if (strategy === "sma_cross") {
+        if (fast && slow) {
+          if (fast > slow && invested === 0) action = "buy";
+          if (fast < slow && invested > 0) action = "sell";
+        }
+      } else if (strategy === "rsi_strat") {
+        if (rsiVal < 30 && invested === 0) action = "buy";
+        if (rsiVal > 70 && invested > 0) action = "sell";
+      } else if (strategy === "bollinger") {
+        if (fast) {
+           if (price > fast*1.05 && invested === 0) action = "buy";
+           if (price < fast*0.95 && invested > 0) action = "sell";
+        }
       }
+
+      if (action === "buy") {
+        invested = cash / price;
+        cash = 0;
+      } else if (action === "sell") {
+        cash = invested * price;
+        invested = 0;
+      }
+
+      const curVal = cash + (invested * price);
+      equityCurve.push(curVal);
     }
-    
-    if (action === "buy") {
-      invested = cash / price;
-      cash = 0;
-    } else if (action === "sell") {
-      cash = invested * price;
-      invested = 0;
+
+    const returns = [];
+    let peak = equityCurve[0];
+    let maxDD = 0;
+    let downsideSum = 0;
+
+    for(let i=1; i<equityCurve.length; i++) {
+      const r = (equityCurve[i] - equityCurve[i-1]) / equityCurve[i-1];
+      returns.push(r);
+
+      if (equityCurve[i] > peak) peak = equityCurve[i];
+      const dd = (peak - equityCurve[i]) / peak;
+      if (dd > maxDD) maxDD = dd;
+
+      if (r < 0) downsideSum += r*r;
     }
-    
-    const curVal = cash + (invested * price);
-    equityCurve.push(curVal);
+
+    const avgRet = returns.reduce((a,b)=>a+b,0)/returns.length;
+    const stdDev = Math.sqrt(returns.reduce((s,r)=>s+(r-avgRet)**2, 0)/returns.length);
+    const downDev = Math.sqrt(downsideSum / returns.length);
+    const annRet = avgRet * 365;
+    const annVol = stdDev * Math.sqrt(365);
+    const riskFree = 0.02;
+
+    const sharpe = annVol > 0 ? (annRet - riskFree) / annVol : 0;
+    const sortino = downDev > 0 ? (annRet - riskFree) / (downDev * Math.sqrt(365)) : 0;
+
+    if (el.btSharpe) el.btSharpe.textContent = sharpe.toFixed(2);
+    if (el.btSortino) el.btSortino.textContent = sortino.toFixed(2);
+    if (el.btMaxDD) el.btMaxDD.textContent = "-" + (maxDD*100).toFixed(1) + "%";
+
+    updateTrendClass(el.btSharpe, sharpe);
+    updateTrendClass(el.btSortino, sortino);
+
+    drawBacktestChart(el.btChart, pricePath, equityCurve);
+  } catch (err) {
+    console.warn(err);
+    showToast("Backtest failed. Please retry.", "error");
+  } finally {
+    if (el.btRunBtn) {
+      el.btRunBtn.disabled = false;
+      el.btRunBtn.textContent = "Run backtest";
+    }
   }
-  
-  const returns = [];
-  let peak = equityCurve[0];
-  let maxDD = 0;
-  let downsideSum = 0;
-  
-  for(let i=1; i<equityCurve.length; i++) {
-    const r = (equityCurve[i] - equityCurve[i-1]) / equityCurve[i-1];
-    returns.push(r);
-    
-    if (equityCurve[i] > peak) peak = equityCurve[i];
-    const dd = (peak - equityCurve[i]) / peak;
-    if (dd > maxDD) maxDD = dd;
-    
-    if (r < 0) downsideSum += r*r;
-  }
-  
-  const avgRet = returns.reduce((a,b)=>a+b,0)/returns.length;
-  const stdDev = Math.sqrt(returns.reduce((s,r)=>s+(r-avgRet)**2, 0)/returns.length);
-  const downDev = Math.sqrt(downsideSum / returns.length);
-  const annRet = avgRet * 365;
-  const annVol = stdDev * Math.sqrt(365);
-  const riskFree = 0.02;
-  
-  const sharpe = annVol > 0 ? (annRet - riskFree) / annVol : 0;
-  const sortino = downDev > 0 ? (annRet - riskFree) / (downDev * Math.sqrt(365)) : 0;
-  
-  if (el.btSharpe) el.btSharpe.textContent = sharpe.toFixed(2);
-  if (el.btSortino) el.btSortino.textContent = sortino.toFixed(2);
-  if (el.btMaxDD) el.btMaxDD.textContent = "-" + (maxDD*100).toFixed(1) + "%";
-  
-  updateTrendClass(el.btSharpe, sharpe);
-  updateTrendClass(el.btSortino, sortino);
-  
-  drawBacktestChart(el.btChart, pricePath, equityCurve);
 }
 
 function drawBacktestChart(canvas, buyHold, strategy) {
@@ -1949,6 +2037,41 @@ function drawBacktestChart(canvas, buyHold, strategy) {
 }
 
 /* ---------------------- Price fetching ---------------------- */
+async function fetchWithRetries(url, options = {}, attempts = 3, backoffMs = 500) {
+  let lastErr = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const headers = options.headers ? { ...options.headers } : {};
+      if (state.cgApiKey) headers["x-cg-demo-api-key"] = state.cgApiKey;
+      const res = await fetch(url, { ...options, headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res;
+    } catch (err) {
+      lastErr = err;
+      await new Promise(r => setTimeout(r, backoffMs * Math.pow(2, i)));
+    }
+  }
+  throw lastErr || new Error("Request failed");
+}
+
+function updatePriceStaleness(success) {
+  if (success) {
+    state.lastPriceSuccess = Date.now();
+    if (el.priceStale) el.priceStale.classList.add("hidden");
+    return;
+  }
+  if (!state.lastPriceSuccess) {
+    if (el.priceStale) el.priceStale.textContent = "No data";
+    if (el.priceStale) el.priceStale.classList.remove("hidden");
+    return;
+  }
+  if (el.priceStale) {
+    const time = new Date(state.lastPriceSuccess).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    el.priceStale.textContent = `Stale since ${time}`;
+    el.priceStale.classList.remove("hidden");
+  }
+}
+
 async function refreshPrices(opts={light:false}) {
   try {
     if (el.refreshBtn) el.refreshBtn.disabled=true;
@@ -1974,8 +2097,7 @@ async function refreshPrices(opts={light:false}) {
     const vsCurrencies = Object.keys(CURRENCY_CONFIG).join(",");
     const url = `https://api.coingecko.com/api/v3/simple/price?vs_currencies=${vsCurrencies}&include_24hr_change=true&ids=`+ids.map(encodeURIComponent).join(",");
     
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("Price error "+res.status);
+    const res = await fetchWithRetries(url, {}, 3, 600);
     const data = await res.json();
     
     if (data.tether) {
@@ -1990,8 +2112,10 @@ async function refreshPrices(opts={light:false}) {
     
     state.priceData = data || {};
     const now = new Date();
+    state.lastPriceSuccess = now.getTime();
     if (el.lastUpdated) el.lastUpdated.textContent = now.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
     if (el.priceStatus) el.priceStatus.textContent="Live prices";
+    updatePriceStaleness(true);
     const portfolioData = calculatePortfolio(state.portfolio,state.priceData);
     state.lastPortfolioData=portfolioData;
     renderAll();
@@ -2000,6 +2124,7 @@ async function refreshPrices(opts={light:false}) {
     console.warn(err);
     if (el.priceStatus) el.priceStatus.textContent="Price error";
     showToast("Could not refresh prices. Try again shortly.","error");
+    updatePriceStaleness(false);
   } finally {
     if (el.refreshBtn) el.refreshBtn.disabled=false;
     if (el.refreshDot) el.refreshDot.classList.remove("animate-pulse");
@@ -2046,8 +2171,8 @@ function renderHoldings(data) {
     tr.innerHTML = `
       <td class="px-3 py-2">
         <div class="flex flex-col">
-          <span class="font-semibold">${h.symbol}</span>
-          <span class="text-[11px] text-slate-400">${h.name}</span>
+          <span class="font-semibold">${escapeHtml(h.symbol)}</span>
+          <span class="text-[11px] text-slate-400">${escapeHtml(h.name)}</span>
         </div>
       </td>
       <td class="px-3 py-2 text-right font-mono">${h.amount.toFixed(6).replace(/\.0+$/, "")}</td>
@@ -2057,8 +2182,8 @@ function renderHoldings(data) {
       <td class="px-3 py-2 text-right font-mono">${formatPercent(h.allocationPct)}</td>
       <td class="px-3 py-2 text-right">
         <div class="inline-flex gap-1">
-          <button data-action="edit" data-id="${h.id}" class="px-2 py-1 text-[11px] rounded-full border border-slate-700 text-slate-200 hover:border-emerald-400">Edit</button>
-          <button data-action="delete" data-id="${h.id}" class="px-2 py-1 text-[11px] rounded-full border border-slate-700 text-slate-300 hover:border-rose-400">Remove</button>
+          <button data-action="edit" data-id="${escapeHtml(h.id)}" class="px-2 py-1 text-[11px] rounded-full border border-slate-700 text-slate-200 hover:border-emerald-400">Edit</button>
+          <button data-action="delete" data-id="${escapeHtml(h.id)}" class="px-2 py-1 text-[11px] rounded-full border border-slate-700 text-slate-300 hover:border-rose-400">Remove</button>
         </div>
       </td>`;
     el.holdingsBody.appendChild(tr);
@@ -2069,8 +2194,8 @@ function renderHoldings(data) {
       card.innerHTML = `
         <div class="flex items-center justify-between gap-2">
           <div>
-            <p class="text-sm font-semibold">${h.symbol}</p>
-            <p class="text-[11px] text-slate-400">${h.name}</p>
+            <p class="text-sm font-semibold">${escapeHtml(h.symbol)}</p>
+            <p class="text-[11px] text-slate-400">${escapeHtml(h.name)}</p>
           </div>
           <div class="text-right">
             <p class="font-mono text-xs text-slate-300">${formatCurrency(h.price)}</p>
@@ -2097,8 +2222,8 @@ function renderHoldings(data) {
           </div>
         </div>
         <div class="mt-3 flex items-center justify-between text-[11px]">
-          <button data-action="edit" data-id="${h.id}" class="inline-flex items-center gap-1 rounded-full border border-slate-700 px-3 py-1.5 text-slate-200 hover:border-emerald-400">Edit</button>
-          <button data-action="delete" data-id="${h.id}" class="inline-flex items-center gap-1 rounded-full border border-slate-700 px-3 py-1.5 text-slate-300 hover:border-rose-400">Remove</button>
+          <button data-action="edit" data-id="${escapeHtml(h.id)}" class="inline-flex items-center gap-1 rounded-full border border-slate-700 px-3 py-1.5 text-slate-200 hover:border-emerald-400">Edit</button>
+          <button data-action="delete" data-id="${escapeHtml(h.id)}" class="inline-flex items-center gap-1 rounded-full border border-slate-700 px-3 py-1.5 text-slate-300 hover:border-rose-400">Remove</button>
         </div>`;
       el.holdingsCards.appendChild(card);
     }
@@ -2117,7 +2242,7 @@ function renderAllocationMini(data) {
     const row = document.createElement("div");
     row.innerHTML = `
       <div class="flex items-center justify-between text-xs">
-        <span class="font-semibold">${h.symbol}</span>
+        <span class="font-semibold">${escapeHtml(h.symbol)}</span>
         <span class="font-mono text-slate-300">${formatPercent(h.allocationPct)}</span>
       </div>
       <div class="mt-1 h-2 rounded-full bg-slate-800 overflow-hidden">
@@ -2340,6 +2465,14 @@ function populateSelects(searchTerm = "") {
     return `<option value="${id}">${meta.symbol}</option>`;
   }).join("");
   el.newsCoinFilter.value = filterSet.has(state.newsFilter) ? state.newsFilter : "all";
+}
+
+function handleSaveCgApiKey(e) {
+  e.preventDefault();
+  const val = (el.cgApiKeyInput?.value || "").trim();
+  state.cgApiKey = val;
+  persistCgApiKey(val);
+  showToast(val ? "API key saved. Lower rate limits." : "Cleared API key.", "info");
 }
 
 function handleTimeframeClick(e) {
@@ -2763,6 +2896,9 @@ function init() {
     if (el.globalCurrencySelect) el.globalCurrencySelect.value = savedCurrency;
   }
 
+  state.cgApiKey = loadCgApiKey();
+  if (el.cgApiKeyInput) el.cgApiKeyInput.value = state.cgApiKey;
+
   populateSelects();
   const data = calculatePortfolio(state.portfolio,state.priceData);
   state.lastPortfolioData=data;
@@ -2785,6 +2921,7 @@ function init() {
   if (el.alertsList) el.alertsList.addEventListener("click", handleAlertsListClick);
   if (el.newsCoinFilter) el.newsCoinFilter.addEventListener("change", handleNewsFilter);
   if (el.refreshBtn) el.refreshBtn.addEventListener("click", ()=>refreshPrices());
+  if (el.cgApiSaveBtn) el.cgApiSaveBtn.addEventListener("click", handleSaveCgApiKey);
   if (el.globalCurrencySelect) el.globalCurrencySelect.addEventListener("change", (e) => {
      const nextCurrency = (e.target.value || "usd").toLowerCase();
      state.currency = CURRENCY_CONFIG[nextCurrency] ? nextCurrency : "usd";
