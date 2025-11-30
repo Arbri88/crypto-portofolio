@@ -670,8 +670,9 @@
               <div class="space-y-1.5">
                 <label for="asset-select"
                        class="block text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Asset</label>
-                <input id="asset-search" type="text" placeholder="Search coin..."
+                <input id="asset-search" type="text" placeholder="Search coin..." list="asset-suggestions"
                        class="w-full mb-1.5 rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+                <datalist id="asset-suggestions"></datalist>
                 <select id="asset-select"
                         class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950"></select>
               </div>
@@ -685,11 +686,11 @@
                 <div class="space-y-1.5">
                   <label for="asset-buy-price"
                          class="block text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Buy price</label>
-                  <div class="flex gap-2">
+                  <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <input id="asset-buy-price" type="number" min="0" step="0.01" placeholder="Use market"
                            class="flex-1 rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
                     <select id="asset-entry-currency"
-                            class="w-20 rounded-xl border border-slate-700 bg-slate-900/70 px-2 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70">
+                            class="w-full sm:w-24 rounded-xl border border-slate-700 bg-slate-900/70 px-2 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70">
                       <option value="usd" selected>USD</option>
                       <option value="eur">EUR</option>
                       <option value="gbp">GBP</option>
@@ -1030,6 +1031,7 @@ const el = {
   assetFormTitle: document.getElementById("asset-form-title"),
   assetForm: document.getElementById("asset-form"),
   assetSearch: document.getElementById("asset-search"),
+  assetSuggestions: document.getElementById("asset-suggestions"),
   assetSelect: document.getElementById("asset-select"),
   assetAmount: document.getElementById("asset-amount"),
   assetBuyPrice: document.getElementById("asset-buy-price"),
@@ -2567,7 +2569,7 @@ function populateSelects(searchTerm = "") {
   const assetOptions = list.slice(0, 150);
   const current = el.assetSelect.value;
   el.assetSelect.innerHTML = assetOptions.map(c => `<option value="${c.id}">${c.symbol} · ${c.name}</option>`).join("");
-  if (current && assetOptions.every(o => o.id !== current)) {
+  if (!term && current && assetOptions.every(o => o.id !== current)) {
     const existing = findCoinMeta(current);
     if (existing) {
       const opt = document.createElement("option");
@@ -2576,7 +2578,20 @@ function populateSelects(searchTerm = "") {
       el.assetSelect.prepend(opt);
     }
   }
-  if (current) el.assetSelect.value = current;
+  if (!term && current) {
+    el.assetSelect.value = current;
+  }
+
+  if (el.assetSuggestions) {
+    const suggestionItems = (term ? list : COINS).slice(0, 20);
+    el.assetSuggestions.innerHTML = suggestionItems
+      .map(c => `<option value="${escapeHtml(c.symbol.toUpperCase())}">${escapeHtml(c.name)}</option>`)
+      .join("");
+  }
+
+  if (!el.assetSelect.value && assetOptions.length) {
+    el.assetSelect.value = assetOptions[0].id;
+  }
 
   el.watchlistSelect.innerHTML = COINS.slice(0, 200).map(c => `<option value="${c.id}">${c.symbol} · ${c.name}</option>`).join("");
   el.alertsAsset.innerHTML = COINS.map(c => `<option value="${c.id}">${c.symbol} · ${c.name}</option>`).join("");
