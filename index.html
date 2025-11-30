@@ -262,15 +262,27 @@
           <span class="uppercase tracking-[0.16em] text-[9px]">Updated</span>
           <span id="last-updated" class="font-mono text-xs text-slate-300">--</span>
         </div>
-        <select id="global-currency-select"
-                class="rounded-full border border-slate-700 bg-slate-900/90 px-2 py-1.5 text-[11px] font-medium text-slate-200 focus:outline-none focus:border-emerald-500/70 focus:ring-1 focus:ring-emerald-400/50">
-          <option value="usd" selected>USD</option>
-          <option value="eur">EUR</option>
-          <option value="gbp">GBP</option>
-          <option value="jpy">JPY</option>
-          <option value="aud">AUD</option>
-          <option value="cad">CAD</option>
-        </select>
+        <div class="flex flex-wrap sm:flex-nowrap items-center justify-start sm:justify-end gap-2 w-full sm:w-auto">
+          <select id="global-currency-select"
+                  class="min-w-[88px] rounded-full border border-slate-700 bg-slate-900/90 px-2 py-1.5 text-[11px] font-medium text-slate-200 focus:outline-none focus:border-emerald-500/70 focus:ring-1 focus:ring-emerald-400/50">
+            <option value="usd" selected>USD</option>
+            <option value="eur">EUR</option>
+            <option value="gbp">GBP</option>
+            <option value="jpy">JPY</option>
+            <option value="aud">AUD</option>
+            <option value="cad">CAD</option>
+          </select>
+          <button id="refresh-btn"
+                  class="inline-flex items-center justify-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[11px] font-semibold hover:border-emerald-400/70 hover:text-emerald-200 transition focus-visible:ring-1 focus-visible:ring-emerald-400/40">
+            <span id="refresh-dot" class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.9)]"></span>
+            Refresh
+          </button>
+          <button id="theme-toggle" type="button"
+                  class="theme-toggle inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold text-slate-100 hover:border-emerald-400/70 hover:text-emerald-200 transition focus-visible:ring-1 focus-visible:ring-emerald-400/40">
+            <span id="theme-dot" class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.9)]"></span>
+            <span id="theme-label">Dark</span>
+          </button>
+        </div>
         <div class="hidden sm:flex items-center gap-2 text-[10px] text-slate-400">
           <div class="relative w-44">
             <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-600">🔑</span>
@@ -279,16 +291,6 @@
           </div>
           <button id="cg-api-save" class="rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[10px] font-medium hover:border-emerald-400/70 hover:text-emerald-200 focus-visible:ring-1 focus-visible:ring-emerald-400/40">Save</button>
         </div>
-        <button id="refresh-btn"
-                class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[11px] font-semibold hover:border-emerald-400/70 hover:text-emerald-200 transition focus-visible:ring-1 focus-visible:ring-emerald-400/40">
-          <span id="refresh-dot" class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.9)]"></span>
-          Refresh
-        </button>
-        <button id="theme-toggle" type="button"
-                class="theme-toggle inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold text-slate-100 hover:border-emerald-400/70 hover:text-emerald-200 transition focus-visible:ring-1 focus-visible:ring-emerald-400/40">
-          <span id="theme-dot" class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.9)]"></span>
-          <span id="theme-label">Dark</span>
-        </button>
       </div>
     </div>
   </header>
