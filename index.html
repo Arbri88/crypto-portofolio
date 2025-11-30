@@ -841,7 +841,8 @@ const STORAGE_KEYS = {
   watchlist: "minimal-crypto-portfolio-v2-watchlist",
   alerts:    "minimal-crypto-portfolio-v2-alerts",
   fx:        "minimal-crypto-fx-rates",
-  benchmarks:"minimal-crypto-benchmarks"
+  benchmarks:"minimal-crypto-benchmarks",
+  currency:  "minimal-crypto-preferred-currency"
 };
 
 const CURRENCY_CONFIG = {
@@ -1079,6 +1080,15 @@ function persistWatchlist() {
 }
 function persistAlerts() {
   saveJson(STORAGE_KEYS.alerts, state.alerts);
+}
+function persistCurrencyPreference() {
+  saveJson(STORAGE_KEYS.currency, state.currency);
+}
+function loadCurrencyPreference() {
+  const saved = loadJson(STORAGE_KEYS.currency, null);
+  if (typeof saved !== "string") return null;
+  const code = saved.toLowerCase();
+  return CURRENCY_CONFIG[code] ? code : null;
 }
 function getDisplayPrice(coinId) {
   const info = state.priceData[coinId];
@@ -2742,10 +2752,16 @@ function init() {
   state.portfolio = loadPortfolio();
   state.watchlist = loadWatchlist();
   state.alerts    = loadAlerts();
-  
+
   // Load persistent FX rates
   const savedFx = loadJson(STORAGE_KEYS.fx, null);
   if (savedFx) state.fxRates = savedFx;
+
+  const savedCurrency = loadCurrencyPreference();
+  if (savedCurrency) {
+    state.currency = savedCurrency;
+    if (el.globalCurrencySelect) el.globalCurrencySelect.value = savedCurrency;
+  }
 
   populateSelects();
   const data = calculatePortfolio(state.portfolio,state.priceData);
@@ -2770,7 +2786,9 @@ function init() {
   if (el.newsCoinFilter) el.newsCoinFilter.addEventListener("change", handleNewsFilter);
   if (el.refreshBtn) el.refreshBtn.addEventListener("click", ()=>refreshPrices());
   if (el.globalCurrencySelect) el.globalCurrencySelect.addEventListener("change", (e) => {
-     state.currency = e.target.value;
+     const nextCurrency = (e.target.value || "usd").toLowerCase();
+     state.currency = CURRENCY_CONFIG[nextCurrency] ? nextCurrency : "usd";
+     persistCurrencyPreference();
      renderAll();
   });
   if (el.indicatorBB) el.indicatorBB.addEventListener("change", handleIndicatorToggle);
