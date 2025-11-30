@@ -1,2 +1,2 @@
-# crypto-portofolio
-portofolio tracker 
+# crypto-portfolio
+Portfolio tracker
