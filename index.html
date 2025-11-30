@@ -7,10 +7,18 @@
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <style>
     :root { color-scheme: dark; }
+    .theme-light { color-scheme: light; }
     html, body { max-width: 100%; overflow-x: hidden; }
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif;
       font-size: 15px;
+    }
+    body.theme-light {
+      background: radial-gradient(circle at 12% 20%, rgba(99,102,241,0.08), transparent 30%),
+                  radial-gradient(circle at 82% 10%, rgba(56,189,248,0.08), transparent 26%),
+                  radial-gradient(circle at 30% 86%, rgba(52,211,153,0.12), transparent 30%),
+                  #f5f7fb;
+      color: #0f172a;
     }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-thumb { background: rgba(148,163,184,.6); border-radius: 999px; }
@@ -27,6 +35,11 @@
       border: 1px solid rgba(148, 163, 184, 0.15);
       box-shadow: 0 10px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.03);
       backdrop-filter: blur(16px);
+    }
+    .theme-light .glass-surface {
+      background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.78));
+      border: 1px solid rgba(148,163,184,0.35);
+      box-shadow: 0 18px 48px rgba(15,23,42,0.12), inset 0 1px 0 rgba(255,255,255,0.7);
     }
     .gradient-border {
       position: relative;
@@ -45,15 +58,27 @@
       mask-composite: exclude;
       pointer-events: none;
     }
+    .theme-light .gradient-border::before {
+      background: linear-gradient(120deg, rgba(59,130,246,0.45), rgba(56,189,248,0.35), rgba(16,185,129,0.35));
+    }
     .pill-active {
       background: linear-gradient(135deg, rgba(16,185,129,0.24), rgba(56,189,248,0.18));
       color: #e2e8f0;
       box-shadow: 0 0 0 1px rgba(16,185,129,0.55), 0 8px 26px rgba(16,185,129,0.08);
     }
+    .theme-light .pill-active {
+      background: linear-gradient(135deg, rgba(59,130,246,0.14), rgba(16,185,129,0.18));
+      color: #0f172a;
+      box-shadow: 0 0 0 1px rgba(59,130,246,0.35), 0 10px 30px rgba(59,130,246,0.12);
+    }
     .focus-glow:focus-visible {
       outline: none;
       box-shadow: 0 0 0 1px rgba(16,185,129,0.55), 0 0 0 6px rgba(16,185,129,0.12);
       border-color: rgba(16,185,129,0.65) !important;
+    }
+    .theme-light .focus-glow:focus-visible {
+      box-shadow: 0 0 0 1px rgba(59,130,246,0.45), 0 0 0 6px rgba(59,130,246,0.16);
+      border-color: rgba(59,130,246,0.55) !important;
     }
     .ticker-shell {
       overflow: hidden;
@@ -74,6 +99,9 @@
       background: linear-gradient(90deg, rgba(71,85,105,0.6), rgba(71,85,105,0.2));
       overflow: hidden;
     }
+    .theme-light .sparkline {
+      background: linear-gradient(90deg, rgba(226,232,240,0.9), rgba(226,232,240,0.35));
+    }
     .sparkline::after {
       content: "";
       position: absolute;
@@ -87,6 +115,11 @@
       transition: transform 200ms ease;
     }
     .sparkline.negative::after { background: linear-gradient(135deg, rgba(248,113,113,0.9), rgba(249,115,22,0.8)); }
+    .theme-light .sparkline::after {
+      background: linear-gradient(135deg, rgba(37,99,235,0.9), rgba(16,185,129,0.85));
+      filter: drop-shadow(0 0 12px rgba(37,99,235,0.28));
+    }
+    .theme-light .sparkline.negative::after { background: linear-gradient(135deg, rgba(248,113,113,0.9), rgba(249,115,22,0.85)); }
 
     .toast-modern {
       position: relative;
@@ -108,6 +141,75 @@
       -webkit-mask-composite: xor;
       mask-composite: exclude;
       pointer-events: none;
+    }
+    .theme-light .toast-modern {
+      background: rgba(255,255,255,0.88);
+      border-color: rgba(148,163,184,0.45);
+      box-shadow: 0 18px 40px rgba(15,23,42,0.18);
+      color: #0f172a;
+    }
+    .theme-light .toast-modern::before {
+      background: linear-gradient(145deg, rgba(59,130,246,0.45), rgba(16,185,129,0.35));
+    }
+
+    .theme-light .text-slate-100,
+    .theme-light .text-slate-200 { color: #0f172a !important; }
+    .theme-light .text-slate-300 { color: #334155 !important; }
+    .theme-light .text-slate-400 { color: #475569 !important; }
+    .theme-light .text-slate-500 { color: #64748b !important; }
+
+    .theme-light .bg-slate-950,
+    .theme-light .bg-slate-950\/80,
+    .theme-light .bg-slate-950\/70,
+    .theme-light .bg-slate-950\/60,
+    .theme-light .bg-slate-900,
+    .theme-light .bg-slate-900\/90,
+    .theme-light .bg-slate-900\/80,
+    .theme-light .bg-slate-900\/70,
+    .theme-light .bg-slate-900\/60,
+    .theme-light .bg-slate-900\/50,
+    .theme-light .bg-slate-900\/40,
+    .theme-light .bg-slate-900\/30,
+    .theme-light .bg-slate-800\/80,
+    .theme-light .bg-slate-800\/70,
+    .theme-light .bg-slate-800\/60,
+    .theme-light .bg-slate-800\/50,
+    .theme-light .bg-slate-700,
+    .theme-light .bg-slate-700\/50 {
+      background-color: rgba(255,255,255,0.82) !important;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 10px 30px rgba(15,23,42,0.12);
+    }
+    .theme-light .border-slate-900\/60,
+    .theme-light .border-slate-900,
+    .theme-light .border-slate-800,
+    .theme-light .border-slate-800\/70,
+    .theme-light .border-slate-800\/60,
+    .theme-light .border-slate-800\/50,
+    .theme-light .border-slate-700,
+    .theme-light .border-slate-700\/50,
+    .theme-light .border-slate-600 {
+      border-color: rgba(148,163,184,0.45) !important;
+    }
+    .theme-light .bg-slate-800\/70 span,
+    .theme-light .bg-slate-800\/70 strong { color: inherit; }
+
+    .theme-light input,
+    .theme-light select,
+    .theme-light textarea {
+      color: #0f172a;
+      background-color: rgba(255,255,255,0.92);
+    }
+
+    .theme-toggle {
+      background: linear-gradient(135deg, rgba(15,23,42,0.9), rgba(15,23,42,0.78));
+      border: 1px solid rgba(148,163,184,0.3);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+    }
+    .theme-light .theme-toggle {
+      background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.82));
+      box-shadow: 0 12px 30px rgba(15,23,42,0.14);
+      border-color: rgba(148,163,184,0.4);
     }
 
     @media (max-width: 640px) {
@@ -172,6 +274,11 @@
                 class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[11px] font-semibold hover:border-emerald-400/70 hover:text-emerald-200 transition focus-visible:ring-1 focus-visible:ring-emerald-400/40">
           <span id="refresh-dot" class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.9)]"></span>
           Refresh
+        </button>
+        <button id="theme-toggle" type="button"
+                class="theme-toggle inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold text-slate-100 hover:border-emerald-400/70 hover:text-emerald-200 transition focus-visible:ring-1 focus-visible:ring-emerald-400/40">
+          <span id="theme-dot" class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.9)]"></span>
+          <span id="theme-label">Dark</span>
         </button>
       </div>
     </div>
@@ -947,7 +1054,8 @@ const STORAGE_KEYS = {
   fx:        "minimal-crypto-fx-rates",
   benchmarks:"minimal-crypto-benchmarks",
   currency:  "minimal-crypto-preferred-currency",
-  cgApiKey:  "minimal-crypto-coingecko-api-key"
+  cgApiKey:  "minimal-crypto-coingecko-api-key",
+  theme:     "minimal-crypto-preferred-theme"
 };
 
 const CURRENCY_CONFIG = {
@@ -984,6 +1092,7 @@ const state = {
       pending: null     // { type, first:{xNorm,yNorm} }
     }
   },
+  theme: "dark",
   lastPortfolioData: null,
   news: [],
   newsFilter: "all",
@@ -1026,6 +1135,9 @@ const el = {
   lastUpdated: document.getElementById("last-updated"),
   refreshBtn: document.getElementById("refresh-btn"),
   refreshDot: document.getElementById("refresh-dot"),
+  themeToggle: document.getElementById("theme-toggle"),
+  themeLabel: document.getElementById("theme-label"),
+  themeDot: document.getElementById("theme-dot"),
   globalCurrencySelect: document.getElementById("global-currency-select"),
   chartCanvas: document.getElementById("performance-chart"),
   chartEmpty: document.getElementById("chart-empty"),
@@ -1218,6 +1330,26 @@ function loadCurrencyPreference() {
   if (typeof saved !== "string") return null;
   const code = saved.toLowerCase();
   return CURRENCY_CONFIG[code] ? code : null;
+}
+function loadThemePreference() {
+  const saved = loadJson(STORAGE_KEYS.theme, "dark");
+  return saved === "light" ? "light" : "dark";
+}
+function persistThemePreference(theme) {
+  saveJson(STORAGE_KEYS.theme, theme === "light" ? "light" : "dark");
+}
+function applyTheme(theme) {
+  const next = theme === "light" ? "light" : "dark";
+  state.theme = next;
+  document.documentElement.classList.toggle("theme-light", next === "light");
+  document.body.classList.toggle("theme-light", next === "light");
+  if (el.themeLabel) el.themeLabel.textContent = next === "light" ? "Light" : "Dark";
+  if (el.themeToggle) el.themeToggle.setAttribute("aria-pressed", next === "light");
+  if (el.themeDot) {
+    el.themeDot.classList.toggle("bg-emerald-400", next !== "light");
+    el.themeDot.classList.toggle("bg-sky-500", next === "light");
+  }
+  persistThemePreference(next);
 }
 function getDisplayPrice(coinId) {
   const info = state.priceData[coinId];
@@ -2624,6 +2756,11 @@ function handleSaveCgApiKey(e) {
   showToast(val ? "API key saved. Lower rate limits." : "Cleared API key.", "info");
 }
 
+function handleThemeToggle() {
+  const next = state.theme === "light" ? "dark" : "light";
+  applyTheme(next);
+}
+
 function handleTimeframeClick(e) {
   const timeframe = e.currentTarget.dataset.timeframe;
   if (!timeframe || timeframe === state.timeframe) return;
@@ -3031,6 +3168,9 @@ function renderAll() {
 
 /* ---------------------- Init ---------------------- */
 function init() {
+  const savedTheme = loadThemePreference();
+  applyTheme(savedTheme);
+
   state.portfolio = loadPortfolio();
   state.watchlist = loadWatchlist();
   state.alerts    = loadAlerts();
@@ -3071,6 +3211,7 @@ function init() {
   if (el.newsCoinFilter) el.newsCoinFilter.addEventListener("change", handleNewsFilter);
   if (el.refreshBtn) el.refreshBtn.addEventListener("click", ()=>refreshPrices());
   if (el.cgApiSaveBtn) el.cgApiSaveBtn.addEventListener("click", handleSaveCgApiKey);
+  if (el.themeToggle) el.themeToggle.addEventListener("click", handleThemeToggle);
   if (el.globalCurrencySelect) el.globalCurrencySelect.addEventListener("change", (e) => {
      const nextCurrency = (e.target.value || "usd").toLowerCase();
      state.currency = CURRENCY_CONFIG[nextCurrency] ? nextCurrency : "usd";
