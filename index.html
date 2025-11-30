@@ -1943,12 +1943,17 @@ async function fetchHistoricalPrices(ids, days) {
       continue;
     }
     const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=${currency}&days=${days}&interval=daily`;
-    const res = await fetchWithRetries(url, {}, 3, 700);
-    const json = await res.json();
-    if (!Array.isArray(json.prices)) continue;
-    result[id] = json.prices;
-    state.priceHistory[id] = state.priceHistory[id] || {};
-    state.priceHistory[id][cacheKey] = json.prices;
+    try {
+      const res = await fetchWithRetries(url, {}, 3, 700);
+      const json = await res.json();
+      if (!Array.isArray(json.prices)) continue;
+      result[id] = json.prices;
+      state.priceHistory[id] = state.priceHistory[id] || {};
+      state.priceHistory[id][cacheKey] = json.prices;
+    } catch (err) {
+      console.warn(`Failed to fetch history for ${id}:`, err);
+      // Don't explode the whole backtest on one bad asset; continue with others.
+    }
   }
 
   return result;
