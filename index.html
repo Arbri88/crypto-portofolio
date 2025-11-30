@@ -9,10 +9,16 @@
     :root { color-scheme: dark; }
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif;
+      font-size: 15px;
     }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-thumb { background: rgba(148,163,184,.6); border-radius: 999px; }
     ::-webkit-scrollbar-track { background: transparent; }
+
+    /* Make the smallest text classes more legible without touching layout. */
+    .text-[11px] { font-size: 12.5px !important; }
+    .text-[10px] { font-size: 12px !important; }
+    .text-[9px] { font-size: 11px !important; }
     canvas { display: block; }
   </style>
 </head>
@@ -20,7 +26,7 @@
 <div class="min-h-screen flex flex-col">
   <!-- HEADER -->
   <header class="border-b border-slate-900 bg-slate-950/80 backdrop-blur">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
+    <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-10 py-4 flex items-center justify-between gap-4">
       <div class="flex items-center gap-3">
         <div class="relative flex h-9 w-9 items-center justify-center">
           <div class="absolute inset-0 rounded-2xl bg-gradient-to-tr from-emerald-500/30 via-cyan-400/10 to-sky-500/40 blur-md opacity-70"></div>
@@ -69,7 +75,7 @@
 
   <!-- MARKET SENTIMENT STRIP -->
   <div class="border-b border-slate-900 bg-slate-950/50 backdrop-blur px-4 py-2">
-    <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-4 text-[10px] sm:text-[11px]">
+    <div class="max-w-screen-xl mx-auto flex flex-wrap items-center justify-between gap-4 text-[10px] sm:text-[11px] px-4 sm:px-6 lg:px-10">
       <div class="flex items-center gap-4">
         <div class="flex items-center gap-2">
           <span class="uppercase tracking-widest text-slate-500">Fear & Greed</span>
@@ -102,7 +108,7 @@
 
   <!-- MAIN -->
   <main class="flex-1">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
+    <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-8 space-y-6 sm:space-y-8">
 
       <!-- SUMMARY STRIP -->
       <section>
@@ -730,7 +736,7 @@
   </main>
 
   <footer class="border-t border-slate-900 py-4">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
+    <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-10 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
       <p>All data stored locally. Prices via public CoinGecko + CryptoCompare APIs.</p>
       <p>For experimentation only – not investment advice.</p>
     </div>
@@ -1003,7 +1009,7 @@ function formatCurrency(v, overrideCurrency) {
   });
 }
 function formatPercent(v) {
-  if (!isFinite(v)) return "0.0%";
+  if (!isFinite(v)) return "--";
   const sign = v > 0 ? "+" : "";
   return sign + v.toFixed(2) + "%";
 }
@@ -1124,6 +1130,7 @@ function calculatePortfolio(portfolio, priceData) {
   let totalValue = 0;
   let totalCost = 0;
   let dayChangeAbs = 0;
+  let hasMissingCost = false;
 
   const detailed = portfolio.map(h => {
     const info = priceData[h.id] || {};
@@ -1136,21 +1143,23 @@ function calculatePortfolio(portfolio, priceData) {
 
     const amount = Number(h.amount) || 0;
     const value = amount * price;
-    const costPer = buyPriceVal > 0 ? buyPriceVal : price;
-    const cost = amount * costPer;
-    const pnlAbs = value - cost;
-    const pnlPct = cost ? pnlAbs / cost * 100 : 0;
+    const costPer = buyPriceVal > 0 ? buyPriceVal : 0;
+    const cost = costPer > 0 ? amount * costPer : NaN;
+    const pnlAbs = isFinite(cost) ? value - cost : NaN;
+    const pnlPct = isFinite(cost) && cost !== 0 ? pnlAbs / cost * 100 : NaN;
+    if (!isFinite(cost)) hasMissingCost = true;
 
     totalValue += value;
-    totalCost += cost;
+    if (isFinite(cost)) totalCost += cost;
     dayChangeAbs += value * (changePct / 100);
 
     return { ...h, amount, price, value, cost, pnlAbs, pnlPct, change24hPct: changePct };
   });
 
-  const dayChangePct = totalValue ? dayChangeAbs / totalValue * 100 : 0;
-  const totalPnlAbs = totalValue - totalCost;
-  const totalPnlPct = totalCost ? totalPnlAbs / totalCost * 100 : 0;
+  const dayChangePct = totalValue ? dayChangeAbs / totalValue * 100 : NaN;
+  const totalCostDisplay = hasMissingCost ? NaN : totalCost;
+  const totalPnlAbs = hasMissingCost ? NaN : (totalValue - totalCost);
+  const totalPnlPct = hasMissingCost || !totalCost ? NaN : totalPnlAbs / totalCost * 100;
 
   if (totalValue > 0) {
     detailed.forEach(h => { h.allocationPct = h.value / totalValue * 100; });
@@ -1169,7 +1178,7 @@ function calculatePortfolio(portfolio, priceData) {
   detailed.sort((a,b) => b.value - a.value);
 
   return {
-    totals: { totalValue, totalCost, totalPnlAbs, totalPnlPct, dayChangeAbs, dayChangePct },
+    totals: { totalValue, totalCost: totalCostDisplay, totalPnlAbs, totalPnlPct, dayChangeAbs, dayChangePct },
     holdings: detailed,
     best, worst
   };
@@ -1986,7 +1995,9 @@ function renderSummary(data) {
   el.totalValue.textContent = formatCurrency(totals.totalValue);
   el.totalCost.textContent = formatCurrency(totals.totalCost);
   el.totalPnl.textContent = formatCurrency(totals.totalPnlAbs);
-  el.totalPnlPct.textContent = totals.totalPnlPct ? formatPercent(totals.totalPnlPct) : "";
+  el.totalPnlPct.textContent = Number.isFinite(totals.totalPnlPct)
+    ? formatPercent(totals.totalPnlPct)
+    : "--";
   updateTrendClass(el.totalPnl, totals.totalPnlAbs);
   updateTrendClass(el.totalPnlPct, totals.totalPnlPct);
   el.assetsCount.textContent = data.holdings.length;
