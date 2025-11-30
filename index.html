@@ -2263,18 +2263,21 @@ function renderWatchlist() {
     const meta = findCoinMeta(id) || { symbol: id.toUpperCase(), name: id };
     const price = getDisplayPrice(id);
     const change = getDisplayChange(id);
+    const changeClass = Number.isFinite(change)
+      ? (change >= 0 ? "text-emerald-400" : "text-rose-400")
+      : "text-slate-400";
     const li = document.createElement("li");
     li.className = "rounded-xl border border-slate-800 bg-slate-900/50 px-3 py-2 flex items-center justify-between gap-3";
     li.innerHTML = `
       <div>
-        <p class="font-semibold">${meta.symbol}</p>
-        <p class="text-[11px] text-slate-500">${meta.name}</p>
+        <p class="font-semibold">${escapeHtml(meta.symbol)}</p>
+        <p class="text-[11px] text-slate-500">${escapeHtml(meta.name)}</p>
       </div>
       <div class="text-right">
         <p class="font-mono">${price!=null?formatCurrency(price):"--"}</p>
-        <p class="text-[11px] ${change>=0?"text-emerald-400":"text-rose-400"}">${change!=null?formatPercent(change):"--"}</p>
+        <p class="text-[11px] ${changeClass}">${change!=null?formatPercent(change):"--"}</p>
       </div>
-      <button data-id="${id}" class="watchlist-remove text-[11px] text-slate-400 hover:text-rose-400">Remove</button>`;
+      <button data-id="${escapeHtml(id)}" class="watchlist-remove text-[11px] text-slate-400 hover:text-rose-400">Remove</button>`;
     el.watchlistList.appendChild(li);
   });
 }
@@ -2389,12 +2392,12 @@ function renderAlerts() {
     li.className = "rounded-xl border border-slate-800 bg-slate-900/40 px-3 py-2 flex items-center justify-between gap-3";
     li.innerHTML = `
       <div>
-        <p class="font-semibold text-sm">${alert.symbol || alert.coinId}</p>
+        <p class="font-semibold text-sm">${escapeHtml(alert.symbol || alert.coinId)}</p>
         <p class="text-[11px] text-slate-500">${alert.direction === "above" ? "≥" : "≤"} ${formatCurrency(alert.target)}</p>
       </div>
       <div class="flex items-center gap-2">
-        <button data-action="toggle" data-id="${alert.id}" class="text-[11px] ${alert.active?"text-emerald-400":"text-slate-500"}">${alert.active?"Active":"Paused"}</button>
-        <button data-action="delete" data-id="${alert.id}" class="text-[11px] text-slate-400 hover:text-rose-400">Remove</button>
+        <button data-action="toggle" data-id="${escapeHtml(alert.id)}" class="text-[11px] ${alert.active?"text-emerald-400":"text-slate-500"}">${alert.active?"Active":"Paused"}</button>
+        <button data-action="delete" data-id="${escapeHtml(alert.id)}" class="text-[11px] text-slate-400 hover:text-rose-400">Remove</button>
       </div>`;
     el.alertsList.appendChild(li);
   });
@@ -2462,7 +2465,7 @@ function populateSelects(searchTerm = "") {
   el.newsCoinFilter.innerHTML = Array.from(filterSet).map(id => {
     if (id === "all") return '<option value="all">All</option>';
     const meta = findCoinMeta(id) || { symbol: id.toUpperCase(), name: id };
-    return `<option value="${id}">${meta.symbol}</option>`;
+    return `<option value="${escapeHtml(id)}">${escapeHtml(meta.symbol)}</option>`;
   }).join("");
   el.newsCoinFilter.value = filterSet.has(state.newsFilter) ? state.newsFilter : "all";
 }
