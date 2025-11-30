@@ -21,6 +21,94 @@
     .text-[9px] { font-size: 11px !important; }
     canvas { display: block; }
 
+    .glass-surface {
+      background: linear-gradient(135deg, rgba(15,23,42,0.82), rgba(15,23,42,0.74));
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.03);
+      backdrop-filter: blur(16px);
+    }
+    .gradient-border {
+      position: relative;
+      border: 1px solid transparent;
+      background-clip: padding-box;
+    }
+    .gradient-border::before {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(120deg, rgba(16,185,129,0.55), rgba(56,189,248,0.3));
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+    .pill-active {
+      background: linear-gradient(135deg, rgba(16,185,129,0.24), rgba(56,189,248,0.18));
+      color: #e2e8f0;
+      box-shadow: 0 0 0 1px rgba(16,185,129,0.55), 0 8px 26px rgba(16,185,129,0.08);
+    }
+    .focus-glow:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 1px rgba(16,185,129,0.55), 0 0 0 6px rgba(16,185,129,0.12);
+      border-color: rgba(16,185,129,0.65) !important;
+    }
+    .ticker-shell {
+      overflow: hidden;
+      position: relative;
+    }
+    .ticker-track {
+      display: inline-flex;
+      gap: 1.5rem;
+      animation: ticker 28s linear infinite;
+    }
+    .ticker-shell:hover .ticker-track { animation-play-state: paused; }
+    @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+    .sparkline {
+      position: relative;
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(71,85,105,0.6), rgba(71,85,105,0.2));
+      overflow: hidden;
+    }
+    .sparkline::after {
+      content: "";
+      position: absolute;
+      inset: -120% 10% auto 10%;
+      height: 220%;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(16,185,129,0.9), rgba(56,189,248,0.8));
+      filter: drop-shadow(0 0 12px rgba(16,185,129,0.35));
+      transform: rotate(var(--spark-tilt, 0deg));
+      transform-origin: center;
+      transition: transform 200ms ease;
+    }
+    .sparkline.negative::after { background: linear-gradient(135deg, rgba(248,113,113,0.9), rgba(249,115,22,0.8)); }
+
+    .toast-modern {
+      position: relative;
+      border-radius: 18px;
+      background: rgba(15,23,42,0.75);
+      border: 1px solid rgba(148,163,184,0.25);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+      padding: 10px 12px;
+    }
+    .toast-modern::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(145deg, rgba(16,185,129,0.55), rgba(56,189,248,0.4));
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
     @media (max-width: 640px) {
       body { font-size: 14px; }
       .mobile-stack { flex-direction: column; align-items: flex-start; }
@@ -31,13 +119,13 @@
 <body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
 <div class="min-h-screen flex flex-col">
   <!-- HEADER -->
-  <header class="border-b border-slate-900 bg-slate-950/80 backdrop-blur">
-    <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-10 py-4 flex flex-wrap sm:flex-nowrap items-center justify-between gap-4">
+  <header class="border-b border-slate-900/60 glass-surface">
+    <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-10 py-3.5 flex flex-wrap sm:flex-nowrap items-center justify-between gap-4">
       <div class="flex items-center gap-3">
         <div class="relative flex h-9 w-9 items-center justify-center">
           <div class="absolute inset-0 rounded-2xl bg-gradient-to-tr from-emerald-500/30 via-cyan-400/10 to-sky-500/40 blur-md opacity-70"></div>
-          <div class="relative flex h-8 w-8 items-center justify-center rounded-2xl border border-emerald-400/60 bg-slate-950/80">
-            <span class="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.9)]"></span>
+          <div class="relative flex h-8 w-8 items-center justify-center rounded-2xl border border-emerald-400/60 bg-slate-950/80 ring-1 ring-emerald-400/30">
+            <span class="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.95)] animate-pulse"></span>
           </div>
         </div>
         <div>
@@ -63,7 +151,7 @@
           <span id="last-updated" class="font-mono text-xs text-slate-300">--</span>
         </div>
         <select id="global-currency-select"
-                class="rounded-full border border-slate-700 bg-slate-900/90 px-2 py-1.5 text-[11px] font-medium text-slate-200 focus:outline-none focus:border-emerald-500/70">
+                class="rounded-full border border-slate-700 bg-slate-900/90 px-2 py-1.5 text-[11px] font-medium text-slate-200 focus:outline-none focus:border-emerald-500/70 focus:ring-1 focus:ring-emerald-400/50">
           <option value="usd" selected>USD</option>
           <option value="eur">EUR</option>
           <option value="gbp">GBP</option>
@@ -72,13 +160,16 @@
           <option value="cad">CAD</option>
         </select>
         <div class="hidden sm:flex items-center gap-2 text-[10px] text-slate-400">
-          <input id="cg-api-key" type="password" placeholder="CoinGecko API key (optional)"
-                 class="w-44 rounded-full border border-slate-800 bg-slate-900/80 px-3 py-1.5 text-[10px] text-slate-200 placeholder:text-slate-600 focus:border-emerald-400/70 focus:outline-none" />
-          <button id="cg-api-save" class="rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[10px] font-medium hover:border-emerald-400/70 hover:text-emerald-200">Save</button>
+          <div class="relative w-44">
+            <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-600">🔑</span>
+            <input id="cg-api-key" type="password" placeholder="CoinGecko API key (optional)"
+                   class="w-full rounded-full border border-slate-800 bg-slate-900/80 pl-8 pr-3 py-1.5 text-[10px] text-slate-200 placeholder:text-slate-600 focus:border-emerald-400/70 focus:outline-none focus:ring-1 focus:ring-emerald-400/40" />
+          </div>
+          <button id="cg-api-save" class="rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[10px] font-medium hover:border-emerald-400/70 hover:text-emerald-200 focus-visible:ring-1 focus-visible:ring-emerald-400/40">Save</button>
         </div>
         <button id="refresh-btn"
-                class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[11px] font-medium hover:border-emerald-400/70 hover:text-emerald-200 transition">
-          <span id="refresh-dot" class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[11px] font-semibold hover:border-emerald-400/70 hover:text-emerald-200 transition focus-visible:ring-1 focus-visible:ring-emerald-400/40">
+          <span id="refresh-dot" class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.9)]"></span>
           Refresh
         </button>
       </div>
@@ -86,31 +177,33 @@
   </header>
 
   <!-- MARKET SENTIMENT STRIP -->
-  <div class="border-b border-slate-900 bg-slate-950/50 backdrop-blur px-4 py-2">
+  <div class="border-b border-slate-900/60 glass-surface px-4 py-2">
     <div class="max-w-screen-xl mx-auto flex flex-wrap items-center justify-between gap-4 text-[10px] sm:text-[11px] px-4 sm:px-6 lg:px-10">
-      <div class="flex items-center gap-4">
-        <div class="flex items-center gap-2">
-          <span class="uppercase tracking-widest text-slate-500">Fear & Greed</span>
-          <div class="flex items-center gap-1.5">
-            <div id="fng-value" class="font-bold text-slate-200">--</div>
-            <div id="fng-label" class="text-slate-400">--</div>
-            <div class="h-1.5 w-12 rounded-full bg-slate-800 overflow-hidden">
-               <div id="fng-bar" class="h-full w-0 bg-slate-500 transition-all duration-500"></div>
+      <div class="ticker-shell w-full sm:w-auto">
+        <div class="ticker-track">
+          <div class="flex items-center gap-2">
+            <span class="uppercase tracking-widest text-slate-500 font-normal">Fear & Greed</span>
+            <div class="flex items-center gap-1.5">
+              <div id="fng-value" class="font-semibold text-slate-200">--</div>
+              <div id="fng-label" class="text-slate-400">--</div>
+              <div class="h-1.5 w-12 rounded-full bg-slate-800/80 overflow-hidden">
+                 <div id="fng-bar" class="h-full w-0 bg-emerald-400 transition-all duration-500"></div>
+              </div>
             </div>
           </div>
+          <div class="flex items-center gap-2">
+            <span class="uppercase tracking-widest text-slate-500 font-normal">BTC Dom</span>
+            <span id="btc-dom" class="font-mono text-slate-200 font-semibold">--%</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="uppercase tracking-widest text-slate-500 font-normal">Altseason</span>
+            <span id="alt-season" class="font-mono text-slate-200 font-semibold">--</span>
+          </div>
+          <div class="hidden sm:flex items-center gap-4 text-slate-500">
+            <div>Global Cap: <span id="global-mcap" class="text-slate-300 font-semibold">--</span></div>
+            <div>Alt Cap <span class="text-[9px] opacity-70">(ex BTC/ETH)</span>: <span id="alt-mcap" class="text-slate-300 font-semibold">--</span></div>
+          </div>
         </div>
-        <div class="flex items-center gap-2">
-          <span class="uppercase tracking-widest text-slate-500">BTC Dom</span>
-          <span id="btc-dom" class="font-mono text-slate-200">--%</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="uppercase tracking-widest text-slate-500">Altseason</span>
-          <span id="alt-season" class="font-mono text-slate-200">--</span>
-        </div>
-      </div>
-      <div class="hidden sm:flex items-center gap-4 text-slate-500">
-        <div>Global Cap: <span id="global-mcap" class="text-slate-300">--</span></div>
-        <div>Alt Cap <span class="text-[9px] opacity-70">(ex BTC/ETH)</span>: <span id="alt-mcap" class="text-slate-300">--</span></div>
       </div>
     </div>
   </div>
@@ -126,11 +219,11 @@
       <section>
         <div class="grid gap-4 sm:gap-5 md:grid-cols-4">
           <!-- Total -->
-          <div class="md:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-5 sm:py-5 shadow-sm shadow-emerald-500/10">
+          <div class="md:col-span-2 rounded-2xl gradient-border glass-surface px-4 py-4 sm:px-5 sm:py-5 shadow-sm shadow-emerald-500/10">
             <div class="flex items-start justify-between gap-4">
               <div>
-                <p class="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Total balance</p>
-                <p id="total-value" class="mt-2 text-2xl sm:text-3xl font-semibold tracking-tight">$0.00</p>
+                <p class="text-[11px] font-normal uppercase tracking-[0.18em] text-slate-400">Total balance</p>
+                <p id="total-value" class="mt-2 text-2xl sm:text-3xl font-bold tracking-tight">$0.00</p>
                 <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] sm:text-xs text-slate-400">
                   <div class="flex items-center gap-1.5">
                     <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
@@ -148,7 +241,7 @@
               <div class="hidden sm:flex flex-col items-end gap-2 text-[11px] text-slate-500">
                 <div class="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1.5">
                   <span class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Assets</span>
-                  <span id="assets-count" class="font-mono text-xs text-slate-100">0</span>
+                  <span id="assets-count" class="font-mono text-xs text-slate-100 font-semibold">0</span>
                 </div>
                 <p id="allocation-note" class="max-w-[12rem] text-right">
                   Keep majors heavy for smoother drawdowns.
@@ -157,24 +250,27 @@
             </div>
           </div>
           <!-- 24h P/L -->
-          <div class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-4.5 sm:py-5">
-            <p class="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">24h P/L</p>
-            <p id="day-pnl" class="mt-2 text-xl font-semibold">$0.00</p>
+          <div class="rounded-2xl glass-surface border border-slate-800 px-4 py-4 sm:px-4.5 sm:py-5">
+            <p class="text-[11px] font-normal uppercase tracking-[0.18em] text-slate-400">24h P/L</p>
+            <p id="day-pnl" class="mt-2 text-xl font-bold">$0.00</p>
             <p id="day-pnl-pct" class="mt-1 text-[11px] font-mono text-slate-400">--</p>
+            <div id="day-spark" class="mt-2 sparkline"></div>
             <p class="mt-2 text-[11px] text-slate-500">Approx from per-asset 24h moves.</p>
           </div>
           <!-- Best -->
-          <div class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-4.5 sm:py-5">
-            <p class="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Best 24h</p>
-            <p id="best-asset-name" class="mt-2 text-sm font-medium">--</p>
+          <div class="rounded-2xl glass-surface border border-slate-800 px-4 py-4 sm:px-4.5 sm:py-5">
+            <p class="text-[11px] font-normal uppercase tracking-[0.18em] text-slate-400">Best 24h</p>
+            <p id="best-asset-name" class="mt-2 text-sm font-semibold">--</p>
             <p id="best-asset-change" class="mt-1 text-[11px] font-mono text-slate-400">--</p>
+            <div id="best-spark" class="mt-2 sparkline"></div>
             <p class="mt-2 text-[11px] text-slate-500">Ignores tiny positions.</p>
           </div>
           <!-- Worst -->
-          <div class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-4.5 sm:py-5">
-            <p class="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Worst 24h</p>
-            <p id="worst-asset-name" class="mt-2 text-sm font-medium">--</p>
+          <div class="rounded-2xl glass-surface border border-slate-800 px-4 py-4 sm:px-4.5 sm:py-5">
+            <p class="text-[11px] font-normal uppercase tracking-[0.18em] text-slate-400">Worst 24h</p>
+            <p id="worst-asset-name" class="mt-2 text-sm font-semibold">--</p>
             <p id="worst-asset-change" class="mt-1 text-[11px] font-mono text-slate-400">--</p>
+            <div id="worst-spark" class="mt-2 sparkline"></div>
             <p class="mt-2 text-[11px] text-slate-500">Helps find what to trim.</p>
           </div>
         </div>
@@ -196,17 +292,17 @@
                 </p>
               </div>
               <div class="flex flex-col items-end gap-2">
-                <div class="inline-flex rounded-full border border-slate-700 bg-slate-950/80 p-0.5 text-[11px]">
+                <div class="inline-flex rounded-full border border-slate-800/80 bg-slate-950/70 p-1 text-[11px] gap-1 shadow-inner shadow-slate-900/70">
                   <button type="button" data-timeframe="24h"
-                          class="timeframe-btn rounded-full px-2.5 py-1 bg-slate-800 text-slate-100 shadow-[0_0_0_1px_rgba(148,163,184,0.55)]">
+                          class="timeframe-btn rounded-full px-3 py-1 font-semibold text-slate-300 pill-active transition focus-visible:outline-none">
                     24H
                   </button>
                   <button type="button" data-timeframe="7d"
-                          class="timeframe-btn rounded-full px-2.5 py-1 text-slate-400 hover:text-slate-100">
+                          class="timeframe-btn rounded-full px-3 py-1 text-slate-400 hover:text-slate-100 transition">
                     7D
                   </button>
                   <button type="button" data-timeframe="30d"
-                          class="timeframe-btn rounded-full px-2.5 py-1 text-slate-400 hover:text-slate-100">
+                          class="timeframe-btn rounded-full px-3 py-1 text-slate-400 hover:text-slate-100 transition">
                     30D
                   </button>
                 </div>
@@ -910,10 +1006,13 @@ const el = {
   assetsCount: document.getElementById("assets-count"),
   dayPnl: document.getElementById("day-pnl"),
   dayPnlPct: document.getElementById("day-pnl-pct"),
+  daySpark: document.getElementById("day-spark"),
   bestName: document.getElementById("best-asset-name"),
   bestChange: document.getElementById("best-asset-change"),
   worstName: document.getElementById("worst-asset-name"),
   worstChange: document.getElementById("worst-asset-change"),
+  bestSpark: document.getElementById("best-spark"),
+  worstSpark: document.getElementById("worst-spark"),
   holdingsBody: document.getElementById("holdings-body"),
   holdingsCards: document.getElementById("holdings-cards"),
   noHoldings: document.getElementById("no-holdings"),
@@ -1463,7 +1562,7 @@ function drawPriceChart(canvas, series, indicators, settings) {
     return {x,y,value:p.value};
   });
 
-  ctx.strokeStyle = "rgba(30,64,175,0.4)";
+  ctx.strokeStyle = "rgba(94,234,212,0.22)";
   ctx.lineWidth = 1;
   ctx.setLineDash([4,6]);
   ctx.beginPath();
@@ -1472,7 +1571,7 @@ function drawPriceChart(canvas, series, indicators, settings) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  ctx.fillStyle = "rgba(148,163,184,0.8)";
+  ctx.fillStyle = "rgba(226,232,240,0.7)";
   ctx.font = "10px system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
   ctx.textAlign = "right"; ctx.textBaseline = "middle";
   ctx.fillText(formatCurrency(maxP), width-4, mainTop+4);
@@ -2058,17 +2157,29 @@ function updatePriceStaleness(success) {
   if (success) {
     state.lastPriceSuccess = Date.now();
     if (el.priceStale) el.priceStale.classList.add("hidden");
+    if (el.refreshDot) {
+      el.refreshDot.classList.remove("bg-amber-400","shadow-[0_0_10px_rgba(251,191,36,0.9)]");
+      el.refreshDot.classList.add("bg-emerald-400","shadow-[0_0_14px_rgba(16,185,129,0.95)]");
+    }
     return;
   }
   if (!state.lastPriceSuccess) {
     if (el.priceStale) el.priceStale.textContent = "No data";
     if (el.priceStale) el.priceStale.classList.remove("hidden");
+    if (el.refreshDot) {
+      el.refreshDot.classList.remove("bg-emerald-400","shadow-[0_0_14px_rgba(16,185,129,0.95)]");
+      el.refreshDot.classList.add("bg-amber-400","shadow-[0_0_10px_rgba(251,191,36,0.9)]");
+    }
     return;
   }
   if (el.priceStale) {
     const time = new Date(state.lastPriceSuccess).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     el.priceStale.textContent = `Stale since ${time}`;
     el.priceStale.classList.remove("hidden");
+  }
+  if (el.refreshDot) {
+    el.refreshDot.classList.remove("bg-emerald-400","shadow-[0_0_14px_rgba(16,185,129,0.95)]");
+    el.refreshDot.classList.add("bg-amber-400","shadow-[0_0_10px_rgba(251,191,36,0.9)]");
   }
 }
 
@@ -2135,6 +2246,12 @@ async function refreshPrices(opts={light:false}) {
 function renderSummary(data) {
   if (!data || !data.totals) return;
   const { totals, best, worst } = data;
+  const updateSpark = (node, change) => {
+    if (!node) return;
+    const tilt = clamp(change || 0, -25, 25);
+    node.style.setProperty("--spark-tilt", `${tilt}deg`);
+    node.classList.toggle("negative", change < 0);
+  };
   el.totalValue.textContent = formatCurrency(totals.totalValue);
   el.totalCost.textContent = formatCurrency(totals.totalCost);
   el.totalPnl.textContent = formatCurrency(totals.totalPnlAbs);
@@ -2148,12 +2265,15 @@ function renderSummary(data) {
   el.dayPnlPct.textContent = formatPercent(totals.dayChangePct);
   updateTrendClass(el.dayPnl, totals.dayChangeAbs);
   updateTrendClass(el.dayPnlPct, totals.dayChangePct);
+  updateSpark(el.daySpark, totals.dayChangePct);
   el.bestName.textContent = best ? `${best.symbol} · ${best.name}` : "--";
   el.bestChange.textContent = best ? formatPercent(best.change24hPct) : "--";
   el.worstName.textContent = worst ? `${worst.symbol} · ${worst.name}` : "--";
   el.worstChange.textContent = worst ? formatPercent(worst.change24hPct) : "--";
   updateTrendClass(el.bestChange, best ? best.change24hPct : 0);
   updateTrendClass(el.worstChange, worst ? worst.change24hPct : 0);
+  updateSpark(el.bestSpark, best ? best.change24hPct : 0);
+  updateSpark(el.worstSpark, worst ? worst.change24hPct : 0);
 }
 
 function renderHoldings(data) {
@@ -2298,17 +2418,17 @@ function renderChartSection(data) {
   }
   document.querySelectorAll(".timeframe-btn").forEach(btn => {
     if (btn.dataset.timeframe === state.timeframe) {
-      btn.classList.add("bg-slate-800","text-slate-100","shadow-[0_0_0_1px_rgba(148,163,184,0.55)]");
+      btn.classList.add("pill-active","text-slate-100");
     } else {
-      btn.classList.remove("bg-slate-800","text-slate-100","shadow-[0_0_0_1px_rgba(148,163,184,0.55)]");
+      btn.classList.remove("pill-active","text-slate-100");
       btn.classList.add("text-slate-400");
     }
   });
   document.querySelectorAll(".chart-type-btn").forEach(btn => {
     if (btn.dataset.chartType === state.chartSettings.chartType) {
-      btn.classList.add("bg-slate-800","text-slate-100","shadow-[0_0_0_1px_rgba(148,163,184,0.55)]");
+      btn.classList.add("pill-active","text-slate-100");
     } else {
-      btn.classList.remove("bg-slate-800","text-slate-100","shadow-[0_0_0_1px_rgba(148,163,184,0.55)]");
+      btn.classList.remove("pill-active","text-slate-100");
       btn.classList.add("text-slate-400");
     }
   });
@@ -2762,13 +2882,13 @@ function showToast(message, type = "info") {
   if (!el.toastContainer) return;
   const toast = document.createElement("div");
   const colors = {
-    success: "bg-emerald-500/20 border-emerald-400 text-emerald-100",
-    error: "bg-rose-500/20 border-rose-400 text-rose-100",
-    warn: "bg-amber-500/20 border-amber-400 text-amber-100",
-    info: "bg-slate-800/80 border-slate-600 text-slate-100"
+    success: "text-emerald-100 shadow-emerald-500/20",
+    error: "text-rose-100 shadow-rose-500/20",
+    warn: "text-amber-100 shadow-amber-500/20",
+    info: "text-slate-100 shadow-slate-500/20"
   };
-  toast.className = `px-3 py-2 rounded-xl border text-sm shadow-lg ${colors[type] || colors.info}`;
-  toast.textContent = message;
+  toast.className = `toast-modern text-sm shadow-lg pl-3 pr-2 ${colors[type] || colors.info}`;
+  toast.innerHTML = `<span class="mr-2">${type === "success" ? "✅" : type === "error" ? "⚠️" : type === "warn" ? "⚡" : "ℹ️"}</span>${message}`;
   el.toastContainer.appendChild(toast);
   setTimeout(() => {
     toast.classList.add("opacity-0", "translate-y-2", "transition-all");
