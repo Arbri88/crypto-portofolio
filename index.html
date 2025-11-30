@@ -934,6 +934,61 @@
             </div>
           </section>
 
+          <!-- WALLET TRACKER -->
+          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-5 sm:py-5">
+            <header class="flex items-start justify-between gap-3">
+              <div>
+                <h2 class="text-sm font-semibold tracking-tight">Wallet tracker</h2>
+                <p class="mt-1 text-[11px] text-slate-500">
+                  Save blockchain addresses you want to monitor. Stored locally with quick explorer links.
+                </p>
+              </div>
+              <span class="rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-400">
+                Addresses
+              </span>
+            </header>
+            <form id="wallet-form" class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs sm:text-sm items-end">
+              <div class="space-y-1">
+                <label for="wallet-chain"
+                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Chain</label>
+                <select id="wallet-chain"
+                        class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+                  <option value="ethereum">Ethereum</option>
+                  <option value="bitcoin">Bitcoin</option>
+                  <option value="solana">Solana</option>
+                  <option value="polygon">Polygon</option>
+                  <option value="bsc">BNB Chain</option>
+                </select>
+              </div>
+              <div class="space-y-1 sm:col-span-2">
+                <label for="wallet-address"
+                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Address</label>
+                <input id="wallet-address" type="text" autocomplete="off" spellcheck="false"
+                       placeholder="0x... or bc1..."
+                       class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+              </div>
+              <div class="space-y-1 sm:col-span-2">
+                <label for="wallet-label"
+                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Label (optional)</label>
+                <input id="wallet-label" type="text" autocomplete="off" maxlength="60"
+                       placeholder="e.g. Cold storage, Trading wallet"
+                       class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+              </div>
+              <div class="sm:col-span-1">
+                <button type="submit"
+                        class="w-full inline-flex items-center justify-center rounded-xl bg-slate-100 px-3 py-2.5 text-xs sm:text-sm font-medium text-slate-950 hover:bg-white/90 transition">
+                  Track wallet
+                </button>
+              </div>
+            </form>
+            <div class="mt-3 border-t border-slate-800 pt-3 sm:pt-4">
+              <p id="wallet-empty" class="text-[11px] text-slate-500">
+                No wallets saved yet. Add an address above to keep it handy.
+              </p>
+              <ul id="wallet-list" class="mt-1 space-y-2 text-xs sm:text-sm"></ul>
+            </div>
+          </section>
+
           <!-- WATCHLIST -->
           <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-5 sm:py-5">
             <header class="flex items-start justify-between gap-3">
@@ -1062,6 +1117,7 @@ const STORAGE_KEYS = {
   portfolio: "minimal-crypto-portfolio-v2-portfolio",
   watchlist: "minimal-crypto-portfolio-v2-watchlist",
   alerts:    "minimal-crypto-portfolio-v2-alerts",
+  wallets:   "minimal-crypto-portfolio-v2-wallets",
   fx:        "minimal-crypto-fx-rates",
   benchmarks:"minimal-crypto-benchmarks",
   currency:  "minimal-crypto-preferred-currency",
@@ -1090,6 +1146,7 @@ const state = {
   portfolio: [],
   watchlist: [],
   alerts: [],
+  wallets: [],
   priceData: {},
   timeframe: "24h",
   chartSeries: { "24h": null, "7d": null, "30d": null },
@@ -1165,6 +1222,12 @@ const el = {
   assetFormError: document.getElementById("asset-form-error"),
   watchlistForm: document.getElementById("watchlist-form"),
   watchlistSelect: document.getElementById("watchlist-select"),
+  walletForm: document.getElementById("wallet-form"),
+  walletChain: document.getElementById("wallet-chain"),
+  walletAddress: document.getElementById("wallet-address"),
+  walletLabel: document.getElementById("wallet-label"),
+  walletList: document.getElementById("wallet-list"),
+  walletEmpty: document.getElementById("wallet-empty"),
   metricAnnualized: document.getElementById("metric-annualized"),
   metricSharpe: document.getElementById("metric-sharpe"),
   metricMaxDD: document.getElementById("metric-maxdd"),
@@ -1271,6 +1334,37 @@ function escapeHtml(value) {
 function findCoinMeta(id) {
   return COINS.find(c => c.id === id) || null;
 }
+function shortenAddress(addr) {
+  if (!addr) return "--";
+  const clean = String(addr).trim();
+  if (clean.length <= 14) return clean;
+  return `${clean.slice(0, 6)}…${clean.slice(-6)}`;
+}
+function describeChain(chain) {
+  const map = {
+    ethereum: "Ethereum",
+    bitcoin: "Bitcoin",
+    solana: "Solana",
+    polygon: "Polygon",
+    bsc: "BNB Chain"
+  };
+  return map[chain] || chain;
+}
+function getExplorerUrl(chain, address) {
+  const safe = encodeURIComponent(address.trim());
+  switch (chain) {
+    case "bitcoin":
+      return `https://www.blockchain.com/btc/address/${safe}`;
+    case "solana":
+      return `https://solscan.io/account/${safe}`;
+    case "polygon":
+      return `https://polygonscan.com/address/${safe}`;
+    case "bsc":
+      return `https://bscscan.com/address/${safe}`;
+    default:
+      return `https://etherscan.io/address/${safe}`;
+  }
+}
 function defaultPortfolio() {
   return [
     { id: "bitcoin",  symbol: "BTC",  name: "Bitcoin",  amount: 0.35, buyPrice: 26000 },
@@ -1303,6 +1397,19 @@ function loadWatchlist() {
   const ids = [...new Set(data)].filter(id => COINS.some(c => c.id === id));
   return ids;
 }
+function loadWallets() {
+  const data = loadJson(STORAGE_KEYS.wallets, []);
+  if (!Array.isArray(data)) return [];
+  return data
+    .map(w => ({
+      id: String(w.id || Date.now() + Math.random()),
+      chain: (w.chain || "ethereum").toLowerCase(),
+      address: String(w.address || "").trim(),
+      label: String(w.label || "").trim(),
+      addedAt: Number(w.addedAt) || Date.now()
+    }))
+    .filter(w => w.address);
+}
 function loadCgApiKey() {
   try { return localStorage.getItem(STORAGE_KEYS.cgApiKey) || ""; } catch { return ""; }
 }
@@ -1329,6 +1436,9 @@ function persistPortfolio() {
 }
 function persistWatchlist() {
   saveJson(STORAGE_KEYS.watchlist, state.watchlist);
+}
+function persistWallets() {
+  saveJson(STORAGE_KEYS.wallets, state.wallets);
 }
 function persistAlerts() {
   saveJson(STORAGE_KEYS.alerts, state.alerts);
@@ -2523,6 +2633,34 @@ function renderAllocationMini(data) {
   });
 }
 
+function renderWallets() {
+  el.walletList.innerHTML = "";
+  if (!state.wallets.length) {
+    el.walletEmpty.classList.remove("hidden");
+    return;
+  }
+  el.walletEmpty.classList.add("hidden");
+  state.wallets.forEach(w => {
+    const li = document.createElement("li");
+    li.className = "rounded-xl border border-slate-800 bg-slate-900/50 px-3 py-2 flex flex-col gap-2";
+    const explorer = getExplorerUrl(w.chain || "ethereum", w.address);
+    const chainLabel = describeChain(w.chain || "ethereum");
+    li.innerHTML = `
+      <div class="flex items-center justify-between gap-2">
+        <div>
+          <p class="font-semibold">${escapeHtml(w.label || shortenAddress(w.address))}</p>
+          <p class="text-[11px] text-slate-500">${escapeHtml(shortenAddress(w.address))} · ${escapeHtml(chainLabel)}</p>
+        </div>
+        <button data-id="${escapeHtml(w.id)}" class="wallet-remove text-[11px] text-slate-400 hover:text-rose-400">Remove</button>
+      </div>
+      <div class="flex items-center justify-between text-[11px] text-slate-400">
+        <span>Added ${humanizeTimeAgo(w.addedAt)}</span>
+        <a href="${explorer}" target="_blank" rel="noopener" class="text-emerald-300 hover:text-emerald-200">View explorer →</a>
+      </div>`;
+    el.walletList.appendChild(li);
+  });
+}
+
 function renderWatchlist() {
   el.watchlistList.innerHTML = "";
   if (!state.watchlist.length) {
@@ -2899,6 +3037,43 @@ function handleWatchlistClick(e) {
   populateSelects(el.assetSearch.value);
 }
 
+function handleWalletForm(e) {
+  e.preventDefault();
+  const chain = (el.walletChain.value || "ethereum").toLowerCase();
+  const address = (el.walletAddress.value || "").trim();
+  const label = (el.walletLabel.value || "").trim();
+  if (!address) {
+    showToast("Enter a wallet address to track", "error");
+    return;
+  }
+  const normalized = address.toLowerCase();
+  const exists = state.wallets.some(w => w.chain === chain && w.address.toLowerCase() === normalized);
+  if (exists) {
+    showToast("Already tracking that wallet", "info");
+    return;
+  }
+  state.wallets.push({
+    id: String(Date.now()),
+    chain,
+    address,
+    label,
+    addedAt: Date.now()
+  });
+  persistWallets();
+  renderWallets();
+  el.walletForm.reset();
+  showToast("Wallet added", "success");
+}
+
+function handleWalletListClick(e) {
+  const btn = e.target.closest("button.wallet-remove");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  state.wallets = state.wallets.filter(w => w.id !== id);
+  persistWallets();
+  renderWallets();
+}
+
 function handleAlertsForm(e) {
   e.preventDefault();
   const coinId = el.alertsAsset.value;
@@ -3170,6 +3345,7 @@ function renderAll() {
   renderSummary(data);
   renderHoldings(data);
   renderAllocationMini(data);
+  renderWallets();
   renderWatchlist();
   renderChartSection(data);
   renderRiskMetrics(data);
@@ -3185,6 +3361,7 @@ function init() {
   state.portfolio = loadPortfolio();
   state.watchlist = loadWatchlist();
   state.alerts    = loadAlerts();
+  state.wallets   = loadWallets();
 
   // Load persistent FX rates
   const savedFx = loadJson(STORAGE_KEYS.fx, null);
@@ -3217,6 +3394,8 @@ function init() {
   if (el.holdingsCards) el.holdingsCards.addEventListener("click", handleHoldingsClick);
   if (el.watchlistForm) el.watchlistForm.addEventListener("submit", handleWatchlistForm);
   if (el.watchlistList) el.watchlistList.addEventListener("click", handleWatchlistClick);
+  if (el.walletForm) el.walletForm.addEventListener("submit", handleWalletForm);
+  if (el.walletList) el.walletList.addEventListener("click", handleWalletListClick);
   if (el.alertsForm) el.alertsForm.addEventListener("submit", handleAlertsForm);
   if (el.alertsList) el.alertsList.addEventListener("click", handleAlertsListClick);
   if (el.newsCoinFilter) el.newsCoinFilter.addEventListener("change", handleNewsFilter);
