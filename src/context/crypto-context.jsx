@@ -1,5 +1,4 @@
 import { createContext, useState, useContext, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { fakeFetchCrypto, fakeFetchAssets } from '../api';
 
 const CryptoContext = createContext({
@@ -9,46 +8,23 @@ const CryptoContext = createContext({
   addAsset: () => {},
 });
 
-// Helper function for math precision
-function calculatePercentDiff(a, b) {
+function percentDifference(a, b) {
   return +(100 * Math.abs((a - b) / ((a + b) / 2))).toFixed(2);
 }
 
-export function CryptoContextProvider({ children }) {
-  // 1. Load User's Assets from Local Storage (Persistence)
-  const [assets, setAssets] = useState(() => {
-    const saved = localStorage.getItem('my-crypto-assets');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // 2. Fetch Coin Data using React Query (Auto-caching & Background Refresh)
-  const { data: cryptoData, isLoading: isCryptoLoading } = useQuery({
-    queryKey: ['coins'],
-    queryFn: fakeFetchCrypto,
-    staleTime: 1000 * 60,
-    refetchInterval: 1000 * 60,
-  });
-
-  // 3. Handle Initial Default Assets (Only if LocalStorage is empty)
-  useEffect(() => {
-    if (!localStorage.getItem('my-crypto-assets')) {
-      fakeFetchAssets().then((initialAssets) => {
-        setAssets(initialAssets);
-      });
-    }
-  }, []);
-
-  // 4. Combine API Data with User Holdings
-  const mappedAssets = (assets || []).map((asset) => {
-    const coin = cryptoData?.result?.find((c) => c.id === asset.id);
+function mapAssets(assets = [], crypto = []) {
+  return assets.map((asset) => {
+    const coin = crypto.find((c) => c.id === asset.id);
 
     if (!coin) {
       return {
         ...asset,
+        price: asset.price ?? 0,
+        purchasePrice: asset.price,
+        grow: false,
+        growPercent: 0,
         totalAmount: 0,
         totalProfit: 0,
-        growPercent: 0,
-        grow: false,
         name: asset.id,
       };
     }
@@ -58,31 +34,62 @@ export function CryptoContextProvider({ children }) {
       name: coin.name,
       icon: coin.icon,
       price: coin.price,
+      purchasePrice: asset.price,
       grow: asset.price < coin.price,
-      growPercent: calculatePercentDiff(asset.price, coin.price),
-      totalAmount: asset.amount * coin.price,
-      totalProfit: asset.amount * coin.price - asset.amount * asset.price,
+      growPercent: percentDifference(asset.price, coin.price),
+      totalAmount: +(asset.amount * coin.price).toFixed(2),
+      totalProfit: +(asset.amount * coin.price - asset.amount * asset.price).toFixed(2),
     };
   });
+}
 
-  // 5. Add Asset Function
+export function CryptoContextProvider({ children }) {
+  const [assets, setAssets] = useState([]);
+  const [crypto, setCrypto] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    async function preload() {
+      setLoading(true);
+      const { result } = await fakeFetchCrypto();
+
+      const savedAssets = localStorage.getItem('portfolio_assets');
+      let baseAssets;
+
+      if (savedAssets) {
+        baseAssets = JSON.parse(savedAssets);
+      } else {
+        baseAssets = await fakeFetchAssets();
+      }
+
+      setAssets(baseAssets);
+      localStorage.setItem('portfolio_assets', JSON.stringify(baseAssets));
+      setCrypto(result);
+      setLoading(false);
+    }
+
+    preload();
+  }, []);
+
   function addAsset(newAsset) {
     setAssets((prev) => {
-      const updated = [...prev, newAsset];
-      localStorage.setItem('my-crypto-assets', JSON.stringify(updated));
-      return updated;
+      const updatedAssets = [...prev, newAsset];
+      localStorage.setItem('portfolio_assets', JSON.stringify(updatedAssets));
+      return updatedAssets;
     });
   }
+
+  const mappedAssets = mapAssets(assets, crypto);
 
   return (
     <CryptoContext.Provider
       value={{
-        loading: isCryptoLoading,
-        crypto: cryptoData?.result || [],
+        loading,
+        crypto,
         assets: mappedAssets,
         addAsset,
       }}
-    >
+      >
       {children}
     </CryptoContext.Provider>
   );

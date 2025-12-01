@@ -26,7 +26,15 @@ export default function AssetAllocationChart({ assets }) {
   return (
     <Card style={{ marginBottom: '2rem' }}>
       <Typography.Title level={4}>Portfolio Allocation</Typography.Title>
-      <div style={{ width: '100%', height: 300 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          width: '100%',
+          height: 400,
+          marginBottom: '1rem',
+        }}
+      >
         <ResponsiveContainer>
           <PieChart>
             <Pie

@@ -76,6 +76,9 @@ export default function AddAssetForm({ onClose }) {
 
   function handleAmountChange(value) {
     const price = form.getFieldValue('price');
+
+    if (price == null) return;
+
     form.setFieldsValue({
       total: +(value * price).toFixed(2),
     });
@@ -83,6 +86,9 @@ export default function AddAssetForm({ onClose }) {
 
   function handlePriceChange(value) {
     const amount = form.getFieldValue('amount');
+
+    if (amount == null) return;
+
     form.setFieldsValue({
       total: +(amount * value).toFixed(2),
     });
@@ -110,13 +116,29 @@ export default function AddAssetForm({ onClose }) {
           label="Amount"
           name="amount"
           rules={[
-            { required: true, type: 'number', min: 0, message: 'Enter a valid positive amount' },
+            {
+              required: true,
+              type: 'number',
+              min: 0,
+              message: 'Amount must be greater than 0',
+            },
           ]}
         >
           <InputNumber placeholder="Enter coin amount" onChange={handleAmountChange} style={{ width: '100%' }} />
         </Form.Item>
 
-        <Form.Item label="Price" name="price">
+        <Form.Item
+          label="Price"
+          name="price"
+          rules={[
+            {
+              required: true,
+              type: 'number',
+              min: 0,
+              message: 'Price must be greater than 0',
+            },
+          ]}
+        >
           <InputNumber onChange={handlePriceChange} style={{ width: '100%' }} />
         </Form.Item>
 
