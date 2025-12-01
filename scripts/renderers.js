@@ -18,6 +18,23 @@ import {
 } from "./utils.js";
 import { computeIndicators, computeSeriesMetrics, ensureChartSeries } from "./analytics.js";
 
+let newsScrollTimer = null;
+
+function startNewsAutoScroll() {
+  if (newsScrollTimer) clearInterval(newsScrollTimer);
+  if (!el.newsStrip) return;
+  newsScrollTimer = setInterval(() => {
+    if (!el.newsStrip) return;
+    if (el.newsStrip.scrollWidth <= el.newsStrip.clientWidth) return;
+    const atEnd = Math.abs(el.newsStrip.scrollWidth - el.newsStrip.clientWidth - el.newsStrip.scrollLeft) < 4;
+    if (atEnd) {
+      el.newsStrip.scrollTo({ left: 0, behavior: "smooth" });
+    } else {
+      el.newsStrip.scrollBy({ left: 240, behavior: "smooth" });
+    }
+  }, 6000);
+}
+
 /* ---------------------- Chart drawing & TA ---------------------- */
 function drawPriceChart(canvas, series, indicators, settings) {
   const ctx = canvas.getContext("2d");
