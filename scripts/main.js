@@ -729,7 +729,7 @@ function playAlertTone() {
 }
 
 /* ---------------------- Init ---------------------- */
-function init() {
+async function init() {
   const savedTheme = loadThemePreference();
   applyTheme(savedTheme);
 
@@ -798,10 +798,31 @@ function init() {
   // Unlock audio context on user interaction
   document.addEventListener('click', unlockAudio, { once: true });
 
-  refreshPrices();
-  fetchNews();
-  fetchSentiment();
-  fetchBenchmarks();
+  // Kick off the initial data loads sequentially.  If any call fails it
+  // gracefully handles its own errors internally and displays fallbacks.
+  try {
+    await refreshPrices();
+  } catch (e) {
+    console.warn("Initial price refresh failed", e);
+  }
+  try {
+    await fetchNews();
+  } catch (e) {
+    console.warn("Initial news fetch failed", e);
+  }
+  try {
+    await fetchSentiment();
+  } catch (e) {
+    console.warn("Initial sentiment fetch failed", e);
+  }
+  try {
+    await fetchBenchmarks();
+  } catch (e) {
+    console.warn("Initial benchmarks fetch failed", e);
+  }
+  // Once the first set of data has loaded, start the periodic auto refresh
+  // timers.  These will use the new guards in services.js to prevent
+  // overlapping fetches.
   scheduleAutoRefresh();
 
   if (el.btRunBtn) el.btRunBtn.addEventListener("click", runBacktest);
