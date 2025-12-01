@@ -1,4 +1,4 @@
-import { CG_API_KEY_TTL_MS, COINS, CURRENCY_CONFIG, STORAGE_KEYS } from "./constants.js";
+import { CG_API_KEY_TTL_MS, COINS, CURRENCY_CONFIG, DEFAULT_CG_API_KEY, STORAGE_KEYS } from "./constants.js";
 import { el, state } from "./state.js";
 
 /* ---------------------- Utils ---------------------- */
@@ -138,21 +138,21 @@ export function loadWallets() {
 export function loadCgApiKey() {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.cgApiKey);
-    if (!raw) return "";
+    if (!raw) return DEFAULT_CG_API_KEY;
     try {
       const parsed = JSON.parse(raw);
       const value = typeof parsed === "string" ? parsed : parsed.value;
       const savedAt = typeof parsed === "object" && parsed ? parsed.savedAt : null;
       if (savedAt && Date.now() - savedAt > CG_API_KEY_TTL_MS) {
         localStorage.removeItem(STORAGE_KEYS.cgApiKey);
-        return "";
+        return DEFAULT_CG_API_KEY;
       }
       return sanitizeString(value, "");
     } catch {
-      return sanitizeString(raw, "");
+      return sanitizeString(raw, DEFAULT_CG_API_KEY);
     }
   } catch {
-    return "";
+    return DEFAULT_CG_API_KEY;
   }
 }
 export function persistCgApiKey(value) {
