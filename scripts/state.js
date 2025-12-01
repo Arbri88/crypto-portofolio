@@ -33,7 +33,7 @@ export const state = {
   // Tracks whether a live price refresh request is currently in flight.
   // Without this flag multiple overlapping requests (from auto-refresh timers
   // and manual triggers) can run concurrently, leading to flickering UI and
-  // racing updates.  When true, subsequent calls to refreshPrices() will
+  // racing updates. When true, subsequent calls to refreshPrices() will
   // return early until the current request finishes.
   priceRefreshing: false,
 

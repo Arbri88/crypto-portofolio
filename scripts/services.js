@@ -82,13 +82,13 @@ export async function refreshPrices(opts={light:false}) {
   // If a refresh is already underway we skip launching a new one.  Frequent actions
   // (like editing holdings or the auto timer) can trigger refreshPrices() repeatedly.
   // Without a guard we end up with overlapping network requests and confusing UI
-  // states.  When a manual refresh (non-light call) is attempted during an active
+  // states. When a manual refresh (non-light call) is attempted during an active
   // refresh we notify the user.
   if (state.priceRefreshing) {
     if (!opts || !opts.light) {
       try {
         // Avoid spamming toasts on rapid auto refreshes; only notify for deliberate
-        // user actions.  The toast container may not be defined in all contexts so
+        // user actions. The toast container may not be defined in all contexts so
         // guard against exceptions.
         showToast("Price refresh already in progress", "info");
       } catch (e) {}
@@ -203,13 +203,13 @@ export async function fetchNews() {
 
   state.newsRefreshing = true;
   try {
-    // Clear existing news and show the loading message.  renderNews() will display
-    // “Loading news…” when state.news is empty and isFallback is false.
+    // Clear existing news and show the loading message. renderNews() will display
+    // "Loading news..." when state.news is empty and isFallback is false.
     state.news = [];
     renderNews();
 
     const url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN";
-    // Use the unified retry/backoff helper.  Setting a modest backoff reduces the
+    // Use the unified retry/backoff helper. Setting a modest backoff reduces the
     // chance of overwhelming the API if it is temporarily unreachable.
     const res = await fetchWithRetries(url, {}, 3, 700);
     const json = await res.json();
