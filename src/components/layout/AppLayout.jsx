@@ -1,0 +1,58 @@
+import { Layout, Card, Switch, ConfigProvider, theme, Typography, List } from 'antd';
+import { useState } from 'react';
+import AssetAllocationChart from '../AssetAllocationChart.jsx';
+import AddAssetForm from '../AddAssetForm.jsx';
+import { useCrypto } from '../../context/crypto-context.jsx';
+
+export default function AppLayout() {
+  const { Header, Content, Sider } = Layout;
+  const [darkMode, setDarkMode] = useState(true);
+  const { assets } = useCrypto();
+
+  return (
+    <ConfigProvider theme={{ algorithm: darkMode ? theme.darkAlgorithm : theme.defaultAlgorithm }}>
+      <Layout style={{ minHeight: '100vh' }}>
+        <Header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ color: 'white', fontWeight: 'bold' }}>CRYPTO PORTFOLIO</div>
+          <Switch
+            checkedChildren="Dark"
+            unCheckedChildren="Light"
+            checked={darkMode}
+            onChange={() => setDarkMode(!darkMode)}
+          />
+        </Header>
+        <Layout>
+          <Sider width="25%" style={{ padding: '1rem' }}>
+            <Card title="Add Asset" bordered={false}>
+              <AddAssetForm onClose={() => setDarkMode((prev) => prev)} />
+            </Card>
+          </Sider>
+          <Content style={{ padding: '1rem' }}>
+            <AssetAllocationChart assets={assets} />
+            <Card title="Holdings" bordered={false}>
+              <List
+                dataSource={assets}
+                renderItem={(item) => (
+                  <List.Item>
+                    <List.Item.Meta
+                      avatar={<img src={item.icon} alt={item.name} style={{ width: 32 }} />}
+                      title={<Typography.Text strong>{item.name}</Typography.Text>}
+                      description={`Amount: ${item.amount} • Current: $${item.price ?? 0}`}
+                    />
+                    <div style={{ textAlign: 'right' }}>
+                      <div>Total: ${item.totalAmount?.toFixed(2) ?? '0.00'}</div>
+                      <div style={{ color: item.grow ? '#22c55e' : '#ef4444' }}>
+                        {item.grow ? '+' : ''}
+                        {item.growPercent}%
+                      </div>
+                    </div>
+                  </List.Item>
+                )}
+              />
+            </Card>
+          </Content>
+        </Layout>
+      </Layout>
+    </ConfigProvider>
+  );
+}
