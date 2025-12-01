@@ -76,10 +76,10 @@ import {
 } from "./renderers.js";
 import { fetchNews, fetchNewsFallback, fetchWithRetries, refreshPrices, updatePriceStaleness } from "./services.js";
 
-const PRICE_REFRESH_MS = 60000;
-const NEWS_REFRESH_MS = 5 * 60000;
-const SENTIMENT_REFRESH_MS = 10 * 60000;
-const STALE_CHECK_MS = 20000;
+const PRICE_REFRESH_MS = 60_000;
+const NEWS_REFRESH_MS = 5 * 60_000;
+const SENTIMENT_REFRESH_MS = 10 * 60_000;
+const STALE_CHECK_MS = 20_000;
 let priceRefreshTimer = null;
 let newsRefreshTimer = null;
 let sentimentRefreshTimer = null;
