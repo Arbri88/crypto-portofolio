@@ -1,6 +1,12 @@
 import { state } from "./state.js";
 import { seededRandom } from "./utils.js";
 
+function roundValue(value, decimals = 2) {
+  if (!Number.isFinite(value)) return value;
+  const factor = Math.pow(10, decimals);
+  return Math.round(value * factor) / factor;
+}
+
 /* ---------------------- Portfolio calculations ---------------------- */
 export function calculatePortfolio(portfolio, priceData) {
   const cur = state.currency || "usd";
@@ -21,11 +27,11 @@ export function calculatePortfolio(portfolio, priceData) {
     const buyPriceVal = (h.buyPrice || 0) * rate;
 
     const amount = Number(h.amount) || 0;
-    const value = amount * price;
+    const value = roundValue(amount * price);
     const costPer = buyPriceVal > 0 ? buyPriceVal : 0;
-    const cost = costPer > 0 ? amount * costPer : NaN;
-    const pnlAbs = isFinite(cost) ? value - cost : NaN;
-    const pnlPct = isFinite(cost) && cost !== 0 ? pnlAbs / cost * 100 : NaN;
+    const cost = costPer > 0 ? roundValue(amount * costPer) : NaN;
+    const pnlAbs = isFinite(cost) ? roundValue(value - cost) : NaN;
+    const pnlPct = isFinite(cost) && cost !== 0 ? roundValue(pnlAbs / cost * 100) : NaN;
     if (!isFinite(cost)) hasMissingCost = true;
 
     totalValue += value;
@@ -35,10 +41,12 @@ export function calculatePortfolio(portfolio, priceData) {
     return { ...h, amount, price, value, cost, pnlAbs, pnlPct, change24hPct: changePct };
   });
 
-  const dayChangePct = totalValue ? dayChangeAbs / totalValue * 100 : NaN;
-  const totalCostDisplay = hasMissingCost ? NaN : totalCost;
-  const totalPnlAbs = hasMissingCost ? NaN : (totalValue - totalCost);
-  const totalPnlPct = hasMissingCost || !totalCost ? NaN : totalPnlAbs / totalCost * 100;
+  dayChangeAbs = roundValue(dayChangeAbs);
+
+  const dayChangePct = totalValue ? roundValue(dayChangeAbs / totalValue * 100) : NaN;
+  const totalCostDisplay = hasMissingCost ? NaN : roundValue(totalCost);
+  const totalPnlAbs = hasMissingCost ? NaN : roundValue(totalValue - totalCost);
+  const totalPnlPct = hasMissingCost || !totalCost ? NaN : roundValue(totalPnlAbs / totalCost * 100);
 
   if (totalValue > 0) {
     detailed.forEach(h => { h.allocationPct = h.value / totalValue * 100; });
