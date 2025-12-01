@@ -1,8 +1,10 @@
-import { Layout, Card, Switch, ConfigProvider, theme, Typography, List } from 'antd';
+import { Layout, Card, Switch, ConfigProvider, theme, Typography, List, Row, Col } from 'antd';
 import { useState } from 'react';
 import AssetAllocationChart from '../AssetAllocationChart.jsx';
 import AddAssetForm from '../AddAssetForm.jsx';
 import { useCrypto } from '../../context/crypto-context.jsx';
+import StrategyBacktester from '../StrategyBacktester.jsx';
+import NewsFeed from '../NewsFeed.jsx';
 
 export default function AppLayout() {
   const { Header, Content, Sider } = Layout;
@@ -50,6 +52,14 @@ export default function AppLayout() {
                 )}
               />
             </Card>
+            <Row gutter={[16, 16]} style={{ marginTop: '1rem' }}>
+              <Col xs={24} lg={12}>
+                <StrategyBacktester />
+              </Col>
+              <Col xs={24} lg={12}>
+                <NewsFeed />
+              </Col>
+            </Row>
           </Content>
         </Layout>
       </Layout>
