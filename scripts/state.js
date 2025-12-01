@@ -24,6 +24,7 @@ export const state = {
   newsFilter: "all",
   newsAutoScrollIndex: 0,
   newsAutoScrollTimer: null,
+  lastBacktest: null,
   currency: "usd",
   fxRates: { usd: 1, eur: 0.92, gbp: 0.79, jpy: 150, aud: 1.5, cad: 1.35 }, // Default fallbacks
   priceHistory: {},

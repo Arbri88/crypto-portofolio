@@ -315,6 +315,7 @@ async function runBacktest() {
     updateTrendClass(el.btSharpe, sharpe);
     updateTrendClass(el.btSortino, sortino);
 
+    state.lastBacktest = { buyHold: pricePath, strategy: equityCurve };
     drawBacktestChart(el.btChart, pricePath, equityCurve);
   } catch (err) {
     console.warn(err);
@@ -336,6 +337,15 @@ function drawBacktestChart(canvas, buyHold, strategy) {
   canvas.height = rect.height * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, rect.width, rect.height);
+
+  const light = state.theme === "light";
+  const palette = light ? {
+    buyHold: "rgba(100,116,139,0.6)",
+    strategy: "rgba(37,99,235,0.9)"
+  } : {
+    buyHold: "rgba(148,163,184,0.5)",
+    strategy: "rgba(129,140,248,1)"
+  };
   
   const pad = 4;
   const w = rect.width - pad*2;
@@ -360,8 +370,8 @@ function drawBacktestChart(canvas, buyHold, strategy) {
     ctx.setLineDash([]);
   }
   
-  plot(buyHold, "rgba(148,163,184,0.5)", [3,3]);
-  plot(strategy, "rgba(129,140,248,1)");
+  plot(buyHold, palette.buyHold, [3,3]);
+  plot(strategy, palette.strategy);
 }
 
 /* ---------------------- Event handlers ---------------------- */
@@ -422,6 +432,12 @@ function handleSaveCgApiKey(e) {
 function handleThemeToggle() {
   const next = state.theme === "light" ? "dark" : "light";
   applyTheme(next);
+  if (state.lastPortfolioData) {
+    renderChartSection(state.lastPortfolioData);
+  }
+  if (state.lastBacktest && el.btChart) {
+    drawBacktestChart(el.btChart, state.lastBacktest.buyHold, state.lastBacktest.strategy);
+  }
 }
 
 function handleTimeframeClick(e) {
