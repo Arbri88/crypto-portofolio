@@ -38,6 +38,12 @@ export const state = {
   // return early until the current request finishes.
   priceRefreshing: false,
 
+  // Monotonic token incremented for every refreshPrices invocation. By
+  // comparing tokens inside async flows we can safely ignore late responses
+  // from older requests, preventing outdated API data from overwriting newer
+  // results when multiple refreshes are triggered in quick succession.
+  priceRefreshToken: 0,
+
   // Tracks whether a news fetch request is currently in flight.  This
   // prevents overlapping news API calls and allows the UI to show a
   // loading indicator while the request is in progress.

@@ -101,6 +101,7 @@ export async function refreshPrices(opts={light:false}) {
   }
 
   state.priceRefreshing = true;
+  const requestToken = ++state.priceRefreshToken;
 
   const idsSet = new Set();
   state.portfolio.forEach(h=>idsSet.add(h.id));
@@ -129,6 +130,8 @@ export async function refreshPrices(opts={light:false}) {
     
     const res = await fetchWithRetries(url, {}, 3, 600);
     const data = await res.json();
+
+    if (requestToken !== state.priceRefreshToken) return;
     
     if (data.tether) {
       const t = data.tether;
@@ -154,6 +157,8 @@ export async function refreshPrices(opts={light:false}) {
     console.warn(err);
     if (ids.length) {
       const fallback = buildFallbackPrices(ids);
+
+      if (requestToken !== state.priceRefreshToken) return;
       state.priceData = fallback;
       const now = new Date();
       state.lastPriceSuccess = now.getTime();
