@@ -12,6 +12,7 @@ import {
   getExplorerUrl,
   humanizeTimeAgo,
   loadJson,
+  pseudoCorrelation,
   saveJson,
   shortenAddress,
   updateTrendClass
