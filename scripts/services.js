@@ -79,6 +79,25 @@ export function updatePriceStaleness(success) {
 }
 
 export async function refreshPrices(opts={light:false}) {
+  // If a refresh is already underway we skip launching a new one.  Frequent actions
+  // (like editing holdings or the auto timer) can trigger refreshPrices() repeatedly.
+  // Without a guard we end up with overlapping network requests and confusing UI
+  // states. When a manual refresh (non-light call) is attempted during an active
+  // refresh we notify the user.
+  if (state.priceRefreshing) {
+    if (!opts || !opts.light) {
+      try {
+        // Avoid spamming toasts on rapid auto refreshes; only notify for deliberate
+        // user actions. The toast container may not be defined in all contexts so
+        // guard against exceptions.
+        showToast("Price refresh already in progress", "info");
+      } catch (e) {}
+    }
+    return;
+  }
+
+  state.priceRefreshing = true;
+
   const idsSet = new Set();
   state.portfolio.forEach(h=>idsSet.add(h.id));
   state.watchlist.forEach(id=>idsSet.add(id));
@@ -147,6 +166,9 @@ export async function refreshPrices(opts={light:false}) {
   } finally {
     if (el.refreshBtn) el.refreshBtn.disabled=false;
     if (el.refreshDot) el.refreshDot.classList.remove("animate-pulse");
+
+    // Mark the refresh cycle complete so subsequent calls can proceed.
+    state.priceRefreshing = false;
   }
 }
 
@@ -175,11 +197,23 @@ export function fetchNewsFallback() {
 }
 
 export async function fetchNews() {
+  // Avoid launching multiple news requests simultaneously.  If a fetch is already
+  // underway (e.g. from the auto refresh timer) simply return.
+  if (state.newsRefreshing) return;
+
+  state.newsRefreshing = true;
   try {
-    const res = await fetch("https://min-api.cryptocompare.com/data/v2/news/?lang=EN");
-    if (!res.ok) throw new Error("News error " + res.status);
+    // Clear existing news and show the loading message. renderNews() will display
+    // "Loading news..." when state.news is empty and isFallback is false.
+    state.news = [];
+    renderNews();
+
+    const url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN";
+    // Use the unified retry/backoff helper. Setting a modest backoff reduces the
+    // chance of overwhelming the API if it is temporarily unreachable.
+    const res = await fetchWithRetries(url, {}, 3, 700);
     const json = await res.json();
-    if (!Array.isArray(json.Data)) throw new Error("Bad news payload");
+    if (!json || !Array.isArray(json.Data)) throw new Error("Bad news payload");
     state.news = json.Data.slice(0, 25).map(item => ({
       id: item.id,
       title: item.title,
@@ -193,6 +227,10 @@ export async function fetchNews() {
   } catch (err) {
     console.warn("News fetch failed", err);
     showToast("News feed unavailable", "warn");
+    // If the remote API fails entirely after retries, fall back to a synthetic set
+    // of news items and inform the renderer that this is a fallback.
     fetchNewsFallback();
+  } finally {
+    state.newsRefreshing = false;
   }
 }

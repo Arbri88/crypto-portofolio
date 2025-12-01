@@ -29,6 +29,18 @@ export const state = {
   priceHistory: {},
   lastPriceSuccess: null,
   cgApiKey: "",
+
+  // Tracks whether a live price refresh request is currently in flight.
+  // Without this flag multiple overlapping requests (from auto-refresh timers
+  // and manual triggers) can run concurrently, leading to flickering UI and
+  // racing updates. When true, subsequent calls to refreshPrices() will
+  // return early until the current request finishes.
+  priceRefreshing: false,
+
+  // Tracks whether a news fetch request is currently in flight.  This
+  // prevents overlapping news API calls and allows the UI to show a
+  // loading indicator while the request is in progress.
+  newsRefreshing: false,
 };
 
 export let audioCtx = null;
