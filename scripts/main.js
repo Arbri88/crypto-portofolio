@@ -76,6 +76,15 @@ import {
 } from "./renderers.js";
 import { fetchNews, fetchNewsFallback, fetchWithRetries, refreshPrices, updatePriceStaleness } from "./services.js";
 
+const PRICE_REFRESH_MS = 60000;
+const NEWS_REFRESH_MS = 5 * 60000;
+const SENTIMENT_REFRESH_MS = 10 * 60000;
+const STALE_CHECK_MS = 20000;
+let priceRefreshTimer = null;
+let newsRefreshTimer = null;
+let sentimentRefreshTimer = null;
+let priceStaleTimer = null;
+
 /* ---------------------- Sentiment ---------------------- */
 async function fetchSentiment() {
   try {
@@ -121,6 +130,24 @@ async function fetchSentiment() {
       }
     }
   } catch (e) { console.log("Sentiment fetch failed", e); }
+}
+
+function checkPriceFreshness() {
+  if (!state.lastPriceSuccess) return;
+  const age = Date.now() - state.lastPriceSuccess;
+  if (age > PRICE_REFRESH_MS * 2) updatePriceStaleness(false);
+}
+
+function scheduleAutoRefresh() {
+  if (priceRefreshTimer) clearInterval(priceRefreshTimer);
+  if (newsRefreshTimer) clearInterval(newsRefreshTimer);
+  if (sentimentRefreshTimer) clearInterval(sentimentRefreshTimer);
+  if (priceStaleTimer) clearInterval(priceStaleTimer);
+
+  priceRefreshTimer = setInterval(() => refreshPrices({ light: true }), PRICE_REFRESH_MS);
+  newsRefreshTimer = setInterval(() => fetchNews(), NEWS_REFRESH_MS);
+  sentimentRefreshTimer = setInterval(() => fetchSentiment(), SENTIMENT_REFRESH_MS);
+  priceStaleTimer = setInterval(checkPriceFreshness, STALE_CHECK_MS);
 }
 
 /* ---------------------- Backtesting ---------------------- */
@@ -701,21 +728,6 @@ function playAlertTone() {
   osc.stop(ctx.currentTime + 0.4);
 }
 
-function startNewsAutoScroll() {
-  if (state.newsAutoScrollTimer) clearInterval(state.newsAutoScrollTimer);
-  if (!el.newsStrip) return;
-  state.newsAutoScrollTimer = setInterval(() => {
-    if (!el.newsStrip) return;
-    if (el.newsStrip.scrollWidth <= el.newsStrip.clientWidth) return;
-    const atEnd = Math.abs(el.newsStrip.scrollWidth - el.newsStrip.clientWidth - el.newsStrip.scrollLeft) < 4;
-    if (atEnd) {
-      el.newsStrip.scrollTo({ left: 0, behavior: "smooth" });
-    } else {
-      el.newsStrip.scrollBy({ left: 240, behavior: "smooth" });
-    }
-  }, 6000);
-}
-
 /* ---------------------- Init ---------------------- */
 function init() {
   const savedTheme = loadThemePreference();
@@ -790,7 +802,8 @@ function init() {
   fetchNews();
   fetchSentiment();
   fetchBenchmarks();
-  
+  scheduleAutoRefresh();
+
   if (el.btRunBtn) el.btRunBtn.addEventListener("click", runBacktest);
 }
 
