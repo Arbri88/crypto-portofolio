@@ -1,5 +1,6 @@
 import { createContext, useState, useContext, useEffect } from 'react';
-import { fakeFetchCrypto, fakeFetchAssets } from '../api';
+import { useQuery } from '@tanstack/react-query';
+import { fetchRealCrypto } from '../api';
 
 const CryptoContext = createContext({
   assets: [],
@@ -7,6 +8,11 @@ const CryptoContext = createContext({
   loading: false,
   addAsset: () => {},
 });
+
+const defaultAssets = [
+  { id: 'bitcoin', amount: 0.25, price: 50000 },
+  { id: 'ethereum', amount: 2, price: 2400 },
+];
 
 function percentDifference(a, b) {
   return +(100 * Math.abs((a - b) / ((a + b) / 2))).toFixed(2);
@@ -45,30 +51,27 @@ function mapAssets(assets = [], crypto = []) {
 
 export function CryptoContextProvider({ children }) {
   const [assets, setAssets] = useState([]);
-  const [crypto, setCrypto] = useState([]);
-  const [loading, setLoading] = useState(false);
+
+  const { data: cryptoData, isLoading } = useQuery({
+    queryKey: ['coins'],
+    queryFn: fetchRealCrypto,
+    refetchInterval: 60000,
+  });
+
+  const crypto = cryptoData || [];
 
   useEffect(() => {
-    async function preload() {
-      setLoading(true);
-      const { result } = await fakeFetchCrypto();
+    const savedAssets = localStorage.getItem('portfolio_assets');
+    let baseAssets;
 
-      const savedAssets = localStorage.getItem('portfolio_assets');
-      let baseAssets;
-
-      if (savedAssets) {
-        baseAssets = JSON.parse(savedAssets);
-      } else {
-        baseAssets = await fakeFetchAssets();
-      }
-
-      setAssets(baseAssets);
-      localStorage.setItem('portfolio_assets', JSON.stringify(baseAssets));
-      setCrypto(result);
-      setLoading(false);
+    if (savedAssets) {
+      baseAssets = JSON.parse(savedAssets);
+    } else {
+      baseAssets = defaultAssets;
     }
 
-    preload();
+    setAssets(baseAssets);
+    localStorage.setItem('portfolio_assets', JSON.stringify(baseAssets));
   }, []);
 
   function addAsset(newAsset) {
@@ -84,7 +87,7 @@ export function CryptoContextProvider({ children }) {
   return (
     <CryptoContext.Provider
       value={{
-        loading,
+        loading: isLoading,
         crypto,
         assets: mappedAssets,
         addAsset,
