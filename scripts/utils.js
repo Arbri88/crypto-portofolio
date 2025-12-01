@@ -1,4 +1,4 @@
-import { COINS, CURRENCY_CONFIG, STORAGE_KEYS } from "./constants.js";
+import { CG_API_KEY_TTL_MS, COINS, CURRENCY_CONFIG, STORAGE_KEYS } from "./constants.js";
 import { el, state } from "./state.js";
 
 /* ---------------------- Utils ---------------------- */
