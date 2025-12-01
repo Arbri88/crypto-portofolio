@@ -1,4 +1,4 @@
-import { CURRENCY_CONFIG, STORAGE_KEYS } from "./constants.js";
+import { CURRENCY_CONFIG, NEWS_API_URL, STORAGE_KEYS } from "./constants.js";
 import { el, state } from "./state.js";
 import { calculatePortfolio } from "./analytics.js";
 import { renderAll, checkAlerts, renderNews, showToast } from "./renderers.js";
@@ -212,21 +212,31 @@ export async function fetchNews() {
     state.news = [];
     renderNews();
 
-    const url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN";
     // Use the unified retry/backoff helper. Setting a modest backoff reduces the
     // chance of overwhelming the API if it is temporarily unreachable.
-    const res = await fetchWithRetries(url, {}, 3, 700);
+    const res = await fetchWithRetries(NEWS_API_URL, {}, 3, 700);
     const json = await res.json();
-    if (!json || !Array.isArray(json.Data)) throw new Error("Bad news payload");
-    state.news = json.Data.slice(0, 25).map(item => ({
-      id: item.id,
-      title: item.title,
-      url: item.url,
-      source: item.source_info?.name || item.source || "CryptoCompare",
-      summary: item.body?.slice(0, 140) || "",
-      publishedAt: (item.published_on || 0) * 1000,
-      coins: (item.tags || "BTC").split("|").map(tag => tag.trim().toUpperCase()).filter(Boolean)
-    }));
+    const items = Array.isArray(json?.news) ? json.news : Array.isArray(json?.Data) ? json.Data : null;
+    if (!items || !items.length) throw new Error("Bad news payload");
+    state.news = items.slice(0, 25).map(item => {
+      const tagsRaw = item.coins || item.tags || item.relatedCoins || "BTC";
+      let tags = [];
+      if (Array.isArray(tagsRaw)) tags = tagsRaw;
+      else if (typeof tagsRaw === "string") tags = tagsRaw.split(/[|,]/);
+      const publishedRaw = item.feedDate ?? item.published_on ?? item.pubDate ?? 0;
+      const publishedAt = Number.isFinite(publishedRaw) && publishedRaw > 0
+        ? (item.feedDate ? publishedRaw : publishedRaw * 1000)
+        : Date.now();
+      return {
+        id: item.id || item._id || item.guid || item.url || String(item.title || "news-item"),
+        title: item.title || item.headline || "Untitled",
+        url: item.url || item.link || "#",
+        source: item.source || item.site || item.source_info?.name || "CoinStats",
+        summary: item.description || item.body?.slice(0, 140) || "",
+        publishedAt,
+        coins: tags.map(tag => String(tag).trim().toUpperCase()).filter(Boolean)
+      };
+    });
     renderNews();
   } catch (err) {
     console.warn("News fetch failed", err);

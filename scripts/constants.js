@@ -96,6 +96,7 @@ export const STORAGE_KEYS = {
 };
 
 export const CG_API_KEY_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+export const DEFAULT_CG_API_KEY = "CG-DATA-API"; // CoinGecko demo key for basic access
 
 export const CURRENCY_CONFIG = {
   usd: { locale: "en-US", currency: "USD", symbol: "$", name: "USD" },
@@ -113,3 +114,5 @@ export const BENCHMARK_RETURNS = {
   year:    { sp: 0.08,  nasdaq: 0.11 },
   hasLive: false
 };
+
+export const NEWS_API_URL = "https://api.coinstats.app/public/v1/news/latest?skip=0&limit=25";
