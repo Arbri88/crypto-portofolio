@@ -32,7 +32,11 @@ export async function fetchWithRetries(url, options = {}, attempts = 3, backoffM
     const timer = setTimeout(() => controller.abort("timeout"), timeoutMs);
     try {
       const headers = options.headers ? { ...options.headers } : {};
-      if (state.cgApiKey) headers["x-cg-demo-api-key"] = state.cgApiKey;
+      const apiKey = (state.cgApiKey || "").trim();
+      if (apiKey) {
+        const headerName = apiKey.toUpperCase() === "CG-DATA-API" ? "x-cg-demo-api-key" : "x-cg-pro-api-key";
+        headers[headerName] = apiKey;
+      }
       const res = await fetch(url, { ...options, headers, signal: controller.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res;
