@@ -54,6 +54,55 @@ function drawPriceChart(canvas, series, indicators, settings) {
   const showRSI = settings.indicators.rsi;
   const showMACD = settings.indicators.macd;
 
+  const light = state.theme === "light";
+  const palette = light ? {
+    gridLine: "rgba(148,163,184,0.5)",
+    axisText: "rgba(15,23,42,0.8)",
+    bbFill: "rgba(59,130,246,0.12)",
+    bbStroke: "rgba(59,130,246,0.55)",
+    bbMid: "rgba(37,99,235,0.92)",
+    gradLineStart: "rgba(37,99,235,0.95)",
+    gradLineEnd: "rgba(16,185,129,0.9)",
+    gradFillTop: "rgba(59,130,246,0.18)",
+    gradFillBottom: "rgba(14,165,233,0.02)",
+    candleUp: "rgba(34,197,94,0.92)",
+    candleDown: "rgba(239,68,68,0.9)",
+    trendline: "rgba(30,41,59,0.65)",
+    fibLine: "rgba(15,23,42,0.22)",
+    fibText: "rgba(51,65,85,0.95)",
+    rsiBand: "rgba(226,232,240,0.9)",
+    rsiStroke: "rgba(100,116,139,0.65)",
+    macdHistPos: "rgba(34,197,94,0.75)",
+    macdHistNeg: "rgba(239,68,68,0.75)",
+    macdLine: "rgba(59,130,246,0.9)",
+    macdSignal: "rgba(100,116,139,0.9)",
+    indicatorLabel: "rgba(51,65,85,0.95)",
+    indicatorSeparator: "rgba(59,130,246,0.32)"
+  } : {
+    gridLine: "rgba(94,234,212,0.22)",
+    axisText: "rgba(226,232,240,0.7)",
+    bbFill: "rgba(56,189,248,0.08)",
+    bbStroke: "rgba(56,189,248,0.8)",
+    bbMid: "rgba(96,165,250,0.7)",
+    gradLineStart: "rgba(56,189,248,1)",
+    gradLineEnd: "rgba(16,185,129,1)",
+    gradFillTop: "rgba(45,212,191,0.20)",
+    gradFillBottom: "rgba(15,23,42,0)",
+    candleUp: "rgba(34,197,94,0.95)",
+    candleDown: "rgba(248,113,113,0.95)",
+    trendline: "rgba(248,250,252,0.85)",
+    fibLine: "rgba(250,250,250,0.35)",
+    fibText: "rgba(148,163,184,0.9)",
+    rsiBand: "rgba(15,23,42,0.8)",
+    rsiStroke: "rgba(148,163,184,0.6)",
+    macdHistPos: "rgba(34,197,94,0.8)",
+    macdHistNeg: "rgba(248,113,113,0.8)",
+    macdLine: "rgba(56,189,248,0.9)",
+    macdSignal: "rgba(148,163,184,0.9)",
+    indicatorLabel: "rgba(148,163,184,0.9)",
+    indicatorSeparator: "rgba(30,64,175,0.5)"
+  };
+
   const hasIndicatorPanel = showRSI || showMACD;
   const paddingX = 28;
   const topPadding = 16;
@@ -97,7 +146,7 @@ function drawPriceChart(canvas, series, indicators, settings) {
     return {x,y,value:p.value};
   });
 
-  ctx.strokeStyle = "rgba(94,234,212,0.22)";
+  ctx.strokeStyle = palette.gridLine;
   ctx.lineWidth = 1;
   ctx.setLineDash([4,6]);
   ctx.beginPath();
@@ -106,7 +155,7 @@ function drawPriceChart(canvas, series, indicators, settings) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  ctx.fillStyle = "rgba(226,232,240,0.7)";
+  ctx.fillStyle = palette.axisText;
   ctx.font = "10px system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
   ctx.textAlign = "right"; ctx.textBaseline = "middle";
   ctx.fillText(formatCurrency(maxP), width-4, mainTop+4);
@@ -138,26 +187,26 @@ function drawPriceChart(canvas, series, indicators, settings) {
       upPts.forEach((p,i)=>{ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
       for (let i=loPts.length-1;i>=0;i--) ctx.lineTo(loPts[i].x, loPts[i].y);
       ctx.closePath();
-      ctx.fillStyle = "rgba(56,189,248,0.08)";
+      ctx.fillStyle = palette.bbFill;
       ctx.fill();
     }
     ctx.lineWidth=1;
     if (upPts.length) {
       ctx.beginPath();
       upPts.forEach((p,i)=>{ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
-      ctx.strokeStyle="rgba(56,189,248,0.8)";
+      ctx.strokeStyle=palette.bbStroke;
       ctx.stroke();
     }
     if (loPts.length) {
       ctx.beginPath();
       loPts.forEach((p,i)=>{ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
-      ctx.strokeStyle="rgba(56,189,248,0.8)";
+      ctx.strokeStyle=palette.bbStroke;
       ctx.stroke();
     }
     if (midPts.length) {
       ctx.beginPath();
       midPts.forEach((p,i)=>{ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
-      ctx.strokeStyle="rgba(96,165,250,0.7)";
+      ctx.strokeStyle=palette.bbMid;
       ctx.setLineDash([3,3]);
       ctx.stroke();
       ctx.setLineDash([]);
@@ -166,11 +215,11 @@ function drawPriceChart(canvas, series, indicators, settings) {
 
   if (chartType === "line") {
     const gradLine = ctx.createLinearGradient(paddingX, mainTop, paddingX, mainBottom);
-    gradLine.addColorStop(0, "rgba(56,189,248,1)");
-    gradLine.addColorStop(1, "rgba(16,185,129,1)");
+    gradLine.addColorStop(0, palette.gradLineStart);
+    gradLine.addColorStop(1, palette.gradLineEnd);
     const gradFill = ctx.createLinearGradient(0, mainTop, 0, mainBottom);
-    gradFill.addColorStop(0, "rgba(45,212,191,0.20)");
-    gradFill.addColorStop(1, "rgba(15,23,42,0)");
+    gradFill.addColorStop(0, palette.gradFillTop);
+    gradFill.addColorStop(1, palette.gradFillBottom);
     ctx.beginPath();
     ctx.moveTo(points[0].x, mainBottom);
     points.forEach(p=>ctx.lineTo(p.x,p.y));
@@ -192,7 +241,7 @@ function drawPriceChart(canvas, series, indicators, settings) {
       const highY = mainTop + (1-(bar.high-minP)/range)*mainH;
       const lowY  = mainTop + (1-(bar.low-minP)/range)*mainH;
       const isUp = bar.close >= bar.open;
-      const color = isUp ? "rgba(34,197,94,0.95)" : "rgba(248,113,113,0.95)";
+      const color = isUp ? palette.candleUp : palette.candleDown;
       ctx.beginPath();
       ctx.moveTo(x, highY); ctx.lineTo(x, lowY);
       ctx.strokeStyle=color; ctx.lineWidth=wickWidth; ctx.stroke();
@@ -224,7 +273,7 @@ function drawPriceChart(canvas, series, indicators, settings) {
     const y2 = mainTop + line.p2.yNorm*mainH;
     ctx.beginPath();
     ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
-    ctx.strokeStyle="rgba(248,250,252,0.85)";
+    ctx.strokeStyle=palette.trendline;
     ctx.setLineDash([4,2]); ctx.stroke(); ctx.setLineDash([]);
   });
 
@@ -240,16 +289,16 @@ function drawPriceChart(canvas, series, indicators, settings) {
       const y = hi + (lo-hi)*lvl;
       ctx.beginPath();
       ctx.moveTo(paddingX,y); ctx.lineTo(width-paddingX,y);
-      ctx.strokeStyle="rgba(250,250,250,0.35)";
+      ctx.strokeStyle=palette.fibLine;
       ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle="rgba(148,163,184,0.9)";
+      ctx.fillStyle=palette.fibText;
       ctx.fillText((lvl*100).toFixed(1)+"%", paddingX+2, y-1);
     });
   });
 
   if (hasIndicatorPanel && indH>20 && indTop!=null) {
     const it = indTop, ib=indBottom, ih=indH;
-    ctx.strokeStyle="rgba(30,64,175,0.5)";
+    ctx.strokeStyle=palette.indicatorSeparator;
     ctx.lineWidth=1; ctx.setLineDash([4,6]);
     ctx.beginPath(); ctx.moveTo(paddingX,ib); ctx.lineTo(width-paddingX,ib); ctx.stroke(); ctx.setLineDash([]);
 
@@ -264,11 +313,11 @@ function drawPriceChart(canvas, series, indicators, settings) {
       });
       const y70 = it + (1-70/100)*ih;
       const y30 = it + (1-30/100)*ih;
-      ctx.fillStyle="rgba(15,23,42,0.8)";
+      ctx.fillStyle=palette.rsiBand;
       ctx.fillRect(paddingX,y70,innerW,y30-y70);
       ctx.beginPath(); ctx.moveTo(paddingX,y70); ctx.lineTo(width-paddingX,y70);
       ctx.moveTo(paddingX,y30); ctx.lineTo(width-paddingX,y30);
-      ctx.strokeStyle="rgba(148,163,184,0.6)";
+      ctx.strokeStyle=palette.rsiStroke;
       ctx.setLineDash([2,3]); ctx.stroke(); ctx.setLineDash([]);
       if (pts.length) {
         ctx.beginPath();
@@ -293,7 +342,7 @@ function drawPriceChart(canvas, series, indicators, settings) {
           const y0 = it + (1-(-minM/rangeM))*ih;
           const yv = it + (1-(v-minM)/rangeM)*ih;
           ctx.beginPath(); ctx.moveTo(x,y0); ctx.lineTo(x,yv);
-          ctx.strokeStyle = v>=0 ? "rgba(34,197,94,0.8)" : "rgba(248,113,113,0.8)";
+          ctx.strokeStyle = v>=0 ? palette.macdHistPos : palette.macdHistNeg;
           ctx.lineWidth=2; ctx.stroke();
         }
         const macdPts=[], sigPts=[];
@@ -312,18 +361,18 @@ function drawPriceChart(canvas, series, indicators, settings) {
         if (macdPts.length) {
           ctx.beginPath();
           macdPts.forEach((p,i)=>{ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
-          ctx.strokeStyle="rgba(56,189,248,0.9)";
+          ctx.strokeStyle=palette.macdLine;
           ctx.lineWidth=1.4; ctx.stroke();
         }
         if (sigPts.length) {
           ctx.beginPath();
           sigPts.forEach((p,i)=>{ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
-          ctx.strokeStyle="rgba(148,163,184,0.9)";
+          ctx.strokeStyle=palette.macdSignal;
           ctx.lineWidth=1; ctx.stroke();
         }
       }
     }
-    ctx.fillStyle="rgba(148,163,184,0.9)";
+    ctx.fillStyle=palette.indicatorLabel;
     ctx.font="9px system-ui,-apple-system,BlinkMacSystemFont,sans-serif";
     ctx.textAlign="left"; ctx.textBaseline="top";
     const tags=[];
