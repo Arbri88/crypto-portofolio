@@ -2,7 +2,27 @@ import { CURRENCY_CONFIG, STORAGE_KEYS } from "./constants.js";
 import { el, state } from "./state.js";
 import { calculatePortfolio } from "./analytics.js";
 import { renderAll, checkAlerts, renderNews, showToast } from "./renderers.js";
-import { saveJson } from "./utils.js";
+import { saveJson, seededRandom } from "./utils.js";
+
+function buildFallbackPrices(ids) {
+  const now = Date.now();
+  const prices = {};
+  ids.forEach((id, idx) => {
+    const base = 12 + seededRandom(now + idx) * 800; // keep numbers reasonable for UI
+    const change = (seededRandom(now - idx) - 0.5) * 18; // -9% to +9%
+    const fx = state.fxRates || {};
+    prices[id] = {
+      usd: Number(base.toFixed(2)),
+      eur: Number((base * (fx.eur || 0.92)).toFixed(2)),
+      gbp: Number((base * (fx.gbp || 0.79)).toFixed(2)),
+      jpy: Number((base * (fx.jpy || 150)).toFixed(0)),
+      aud: Number((base * (fx.aud || 1.5)).toFixed(2)),
+      cad: Number((base * (fx.cad || 1.35)).toFixed(2)),
+      usd_24h_change: Number(change.toFixed(2)),
+    };
+  });
+  return prices;
+}
 
 /* ---------------------- Price fetching ---------------------- */
 export async function fetchWithRetries(url, options = {}, attempts = 3, backoffMs = 500, timeoutMs = 12000) {
@@ -59,15 +79,16 @@ export function updatePriceStaleness(success) {
 }
 
 export async function refreshPrices(opts={light:false}) {
+  const idsSet = new Set();
+  state.portfolio.forEach(h=>idsSet.add(h.id));
+  state.watchlist.forEach(id=>idsSet.add(id));
+  state.alerts.forEach(a=>idsSet.add(a.coinId));
+  const ids = Array.from(idsSet).filter(Boolean);
+
   try {
     if (el.refreshBtn) el.refreshBtn.disabled=true;
     if (el.priceStatus) el.priceStatus.textContent="Refreshing…";
     if (el.refreshDot) el.refreshDot.classList.add("bg-emerald-300","animate-pulse");
-    const idsSet = new Set();
-    state.portfolio.forEach(h=>idsSet.add(h.id));
-    state.watchlist.forEach(id=>idsSet.add(id));
-    state.alerts.forEach(a=>idsSet.add(a.coinId));
-    const ids = Array.from(idsSet).filter(Boolean);
     
     if (!ids.length) {
       state.priceData = {};
@@ -108,9 +129,21 @@ export async function refreshPrices(opts={light:false}) {
     checkAlerts();
   } catch (err) {
     console.warn(err);
-    if (el.priceStatus) el.priceStatus.textContent="Price error";
-    showToast("Could not refresh prices. Try again shortly.","error");
-    updatePriceStaleness(false);
+    if (ids.length) {
+      const fallback = buildFallbackPrices(ids);
+      state.priceData = fallback;
+      const now = new Date();
+      state.lastPriceSuccess = now.getTime();
+      if (el.lastUpdated) el.lastUpdated.textContent = now.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+      if (el.priceStatus) el.priceStatus.textContent="Offline demo prices";
+      showToast("Live price API unavailable; showing synthetic demo prices instead.","warn");
+      renderAll();
+      updatePriceStaleness(true);
+    } else {
+      if (el.priceStatus) el.priceStatus.textContent="Price error";
+      showToast("Could not refresh prices. Try again shortly.","error");
+      updatePriceStaleness(false);
+    }
   } finally {
     if (el.refreshBtn) el.refreshBtn.disabled=false;
     if (el.refreshDot) el.refreshDot.classList.remove("animate-pulse");
