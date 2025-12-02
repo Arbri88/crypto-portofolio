@@ -7,9 +7,8 @@ const postSchema = mongoose.Schema({
   name: String,
   tags: [String],
   selectedFile: String,
-  // Changed to String to preserve exact decimal precision
-  price: { type: String, required: true },
-  amount: { type: String, required: true },
+  price: { type: mongoose.Schema.Types.Decimal128, required: true },
+  amount: { type: mongoose.Schema.Types.Decimal128, required: true },
   likes: {
     type: [String],
     default: [],
