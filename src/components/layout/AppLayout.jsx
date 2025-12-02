@@ -1,11 +1,11 @@
 import { Layout, Card, Switch, ConfigProvider, theme, Typography, List, Row, Col } from 'antd';
 import { useState } from 'react';
-import AssetAllocationChart from '../AssetAllocationChart.jsx';
 import AddAssetForm from '../AddAssetForm.jsx';
 import { useCrypto } from '../../context/crypto-context.jsx';
 import StrategyBacktester from '../StrategyBacktester.jsx';
 import NewsFeed from '../NewsFeed.jsx';
 import MarketOverview from '../MarketOverview.jsx';
+import PortfolioPieChart from '../PortfolioPieChart.jsx';
 
 export default function AppLayout() {
   const { Header, Content, Sider } = Layout;
@@ -31,8 +31,14 @@ export default function AppLayout() {
             </Card>
           </Sider>
           <Content style={{ padding: '1rem' }}>
-            <MarketOverview />
-            <AssetAllocationChart assets={assets} />
+            <Row gutter={[16, 16]} style={{ marginBottom: '1rem' }}>
+              <Col span={24} md={12} lg={16}>
+                <MarketOverview />
+              </Col>
+              <Col span={24} md={12} lg={8}>
+                <PortfolioPieChart />
+              </Col>
+            </Row>
             <Card title="Holdings" bordered={false}>
               <List
                 dataSource={assets}
