@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit';
 
 import postRoutes from './routes/posts.js';
 import userRoutes from './routes/users.js';
+import externalRoutes from './routes/external.js';
 
 dotenv.config();
 const app = express();
@@ -35,6 +36,7 @@ app.use(
 
 app.use('/posts', postRoutes);
 app.use('/user', userRoutes);
+app.use('/external', externalRoutes);
 
 // 5. Global Error Handler (Prevents server crashes)
 app.use((err, req, res, next) => {
