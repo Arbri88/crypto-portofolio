@@ -1,8 +1,49 @@
 import axios from 'axios';
+import crypto from 'crypto';
 import NodeCache from 'node-cache';
 
 // Cache for 5 minutes (300 seconds) to avoid Rate Limits
 const dataCache = new NodeCache({ stdTTL: 300 });
+
+const DEFAULT_NEWS_FEED_URL =
+  'https://api.rss2json.com/v1/api.json?rss_url=https://www.coindesk.com/arc/outboundfeeds/rss/';
+
+const FALLBACK_NEWS = [
+  {
+    id: 'fallback-1',
+    title: 'Crypto markets hold steady despite macro headwinds',
+    url: 'https://www.coindesk.com/',
+    source: 'Demo Source',
+    publishedOn: new Date().toISOString(),
+    imageUrl: 'https://cryptocompare.com/media/37746251/btc.png',
+  },
+  {
+    id: 'fallback-2',
+    title: 'Layer 2 networks continue to see strong user growth',
+    url: 'https://www.coindesk.com/',
+    source: 'Demo Source',
+    publishedOn: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    imageUrl: 'https://cryptocompare.com/media/37746238/eth.png',
+  },
+];
+
+const isSafeUrl = (value) => {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+};
+
+const sanitizeNewsItem = (item) => ({
+  id: item.guid || item.link || item.title || crypto.randomUUID(),
+  title: item.title?.toString().trim() || 'Untitled story',
+  url: isSafeUrl(item.link || item.url) ? item.link || item.url : '#',
+  source: item.source || item.source_info?.name || 'Unknown',
+  publishedOn: item.pubDate || item.published || new Date().toISOString(),
+  imageUrl: item.enclosure?.link || item.thumbnail || item.imageurl || '',
+});
 
 export const getCryptoTickers = async (req, res) => {
   try {
@@ -42,24 +83,22 @@ export const getCryptoNews = async (req, res) => {
     const cachedNews = dataCache.get('news');
     if (cachedNews) return res.status(200).json(cachedNews);
 
-    // Using Bing News Search API (Requires Key) or a free alternative like NewsData.io
-    // REPLACE 'YOUR_RAPIDAPI_KEY' in .env if using RapidAPI, or use a free endpoint
-    // For this demo, I will use a mock structure or a free RSS-to-JSON service for crypto
+    const feedUrl = isSafeUrl(process.env.NEWS_FEED_URL)
+      ? process.env.NEWS_FEED_URL
+      : DEFAULT_NEWS_FEED_URL;
 
-    // Example using a free CoinDesk RSS feed converted to JSON (No key required for this demo)
-    const response = await axios.get('https://api.rss2json.com/v1/api.json?rss_url=https://www.coindesk.com/arc/outboundfeeds/rss/');
+    const response = await axios.get(feedUrl, { timeout: 8000 });
+    const items = Array.isArray(response.data?.items) ? response.data.items : [];
+    const cleanNews = items.map(sanitizeNewsItem).filter((item) => item.url !== '#');
 
-    const cleanNews = response.data.items.map((item) => ({
-      title: item.title,
-      link: item.link,
-      pubDate: item.pubDate,
-      thumbnail: item.thumbnail,
-    }));
-
-    dataCache.set('news', cleanNews);
-    res.status(200).json(cleanNews);
+    const payload = cleanNews.length ? cleanNews : FALLBACK_NEWS;
+    dataCache.set('news', payload);
+    res.status(200).json(payload);
   } catch (error) {
     console.error('News Error:', error.message);
-    res.status(500).json({ message: 'Could not fetch news' });
+    const staleData = dataCache.get('news');
+    if (staleData) return res.status(200).json(staleData);
+
+    res.status(200).json(FALLBACK_NEWS);
   }
 };
