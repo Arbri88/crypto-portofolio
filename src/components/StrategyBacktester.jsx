@@ -20,6 +20,11 @@ export default function StrategyBacktester() {
       return;
     }
 
+    if (!selectedCoin.symbol) {
+      message.error('Selected asset is missing a tradable symbol. Please refresh or pick another coin.');
+      return;
+    }
+
     setLoading(true);
     setResult(null);
 

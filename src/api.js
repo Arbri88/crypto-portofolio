@@ -19,5 +19,6 @@ export async function fetchRealCrypto() {
     name: coin.name,
     icon: coin.image,
     price: coin.current_price,
+    symbol: coin.symbol,
   }));
 }
