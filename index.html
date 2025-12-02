@@ -4,7 +4,9 @@
   <meta charset="UTF-8" />
   <title>Crypto Portfolio Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Professional crypto portfolio tracker with live prices, technical analysis, alerts, and risk metrics">
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root { color-scheme: dark; }
     .theme-light { color-scheme: light; }
@@ -25,11 +27,6 @@
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-thumb { background: rgba(148,163,184,.6); border-radius: 999px; }
     ::-webkit-scrollbar-track { background: transparent; }
-
-    /* Make the smallest text classes more legible without touching layout. */
-    .text-[11px] { font-size: 12.5px !important; }
-    .text-[10px] { font-size: 12px !important; }
-    .text-[9px] { font-size: 11px !important; }
     canvas { display: block; }
 
     .glass-surface {
@@ -39,12 +36,9 @@
       backdrop-filter: blur(16px);
     }
     .theme-light .glass-surface {
-      background:
-        linear-gradient(135deg, rgba(255,255,255,0.85), rgba(241,245,249,0.82)),
-        linear-gradient(120deg, rgba(59,130,246,0.10), rgba(16,185,129,0.08));
+      background: linear-gradient(135deg, rgba(255,255,255,0.85), rgba(241,245,249,0.82));
       border: 1px solid rgba(148,163,184,0.36);
       box-shadow: 0 24px 56px rgba(15,23,42,0.14), inset 0 1px 0 rgba(255,255,255,0.82);
-      backdrop-filter: blur(18px) saturate(112%);
     }
     .gradient-border {
       position: relative;
@@ -63,9 +57,6 @@
       mask-composite: exclude;
       pointer-events: none;
     }
-    .theme-light .gradient-border::before {
-      background: linear-gradient(120deg, rgba(59,130,246,0.45), rgba(56,189,248,0.35), rgba(16,185,129,0.35));
-    }
     .pill-active {
       background: linear-gradient(135deg, rgba(16,185,129,0.24), rgba(56,189,248,0.18));
       color: #e2e8f0;
@@ -74,21 +65,8 @@
     .theme-light .pill-active {
       background: linear-gradient(135deg, rgba(59,130,246,0.14), rgba(16,185,129,0.18));
       color: #0f172a;
-      box-shadow: 0 0 0 1px rgba(59,130,246,0.35), 0 10px 30px rgba(59,130,246,0.12);
     }
-    .focus-glow:focus-visible {
-      outline: none;
-      box-shadow: 0 0 0 1px rgba(16,185,129,0.55), 0 0 0 6px rgba(16,185,129,0.12);
-      border-color: rgba(16,185,129,0.65) !important;
-    }
-    .theme-light .focus-glow:focus-visible {
-      box-shadow: 0 0 0 1px rgba(59,130,246,0.45), 0 0 0 6px rgba(59,130,246,0.16);
-      border-color: rgba(59,130,246,0.55) !important;
-    }
-    .ticker-shell {
-      overflow: hidden;
-      position: relative;
-    }
+    .ticker-shell { overflow: hidden; position: relative; }
     .ticker-track {
       display: inline-flex;
       gap: 1.5rem;
@@ -104,78 +82,51 @@
       background: linear-gradient(90deg, rgba(71,85,105,0.6), rgba(71,85,105,0.2));
       overflow: hidden;
     }
-    .theme-light .sparkline {
-      background: linear-gradient(90deg, rgba(226,232,240,0.9), rgba(226,232,240,0.35));
-    }
     .sparkline::after {
       content: "";
       position: absolute;
-      inset: -120% 10% auto 10%;
-      height: 220%;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: var(--spark-width, 50%);
       border-radius: 999px;
       background: linear-gradient(135deg, rgba(16,185,129,0.9), rgba(56,189,248,0.8));
-      filter: drop-shadow(0 0 12px rgba(16,185,129,0.35));
-      transform: rotate(var(--spark-tilt, 0deg));
-      transform-origin: center;
-      transition: transform 200ms ease;
+      transition: width 0.5s ease;
     }
-    .sparkline.negative::after { background: linear-gradient(135deg, rgba(248,113,113,0.9), rgba(249,115,22,0.8)); }
-    .theme-light .sparkline::after {
-      background: linear-gradient(135deg, rgba(37,99,235,0.9), rgba(16,185,129,0.85));
-      filter: drop-shadow(0 0 12px rgba(37,99,235,0.28));
+    .sparkline.negative::after { 
+      background: linear-gradient(135deg, rgba(248,113,113,0.9), rgba(249,115,22,0.8)); 
     }
-    .theme-light .sparkline.negative::after { background: linear-gradient(135deg, rgba(248,113,113,0.9), rgba(249,115,22,0.85)); }
 
-    .alloc-pie {
-      width: 40px;
-      height: 40px;
+    .alloc-bar {
+      height: 8px;
       border-radius: 999px;
-      background: conic-gradient(var(--alloc-color, #22c55e) calc(var(--alloc, 0) * 1%), rgba(148,163,184,0.2) 0);
-      box-shadow: inset 0 0 0 1px rgba(148,163,184,0.25);
-      position: relative;
+      background: rgba(71,85,105,0.3);
+      overflow: hidden;
     }
-    .alloc-pie::after {
-      content: "";
-      position: absolute;
-      inset: 8px;
+    .alloc-bar-fill {
+      height: 100%;
       border-radius: 999px;
-      background: rgba(15,23,42,0.9);
-      box-shadow: inset 0 0 0 1px rgba(148,163,184,0.25);
-    }
-    .theme-light .alloc-pie::after {
-      background: rgba(255,255,255,0.94);
-      box-shadow: inset 0 0 0 1px rgba(148,163,184,0.35);
+      transition: width 0.5s ease;
     }
 
     .toast-modern {
       position: relative;
       border-radius: 18px;
-      background: rgba(15,23,42,0.75);
+      background: rgba(15,23,42,0.9);
       border: 1px solid rgba(148,163,184,0.25);
       backdrop-filter: blur(10px);
       box-shadow: 0 20px 60px rgba(0,0,0,0.45);
-      padding: 10px 12px;
+      padding: 12px 16px;
+      animation: slideIn 0.3s ease;
     }
-    .toast-modern::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      padding: 1px;
-      background: linear-gradient(145deg, rgba(16,185,129,0.55), rgba(56,189,248,0.4));
-      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      pointer-events: none;
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
     }
     .theme-light .toast-modern {
-      background: rgba(255,255,255,0.88);
+      background: rgba(255,255,255,0.95);
       border-color: rgba(148,163,184,0.45);
-      box-shadow: 0 18px 40px rgba(15,23,42,0.18);
       color: #0f172a;
-    }
-    .theme-light .toast-modern::before {
-      background: linear-gradient(145deg, rgba(59,130,246,0.45), rgba(16,185,129,0.35));
     }
 
     .theme-light .text-slate-100,
@@ -187,60 +138,40 @@
     .theme-light .bg-slate-950,
     .theme-light .bg-slate-950\/80,
     .theme-light .bg-slate-950\/70,
-    .theme-light .bg-slate-950\/50,
-    .theme-light .bg-slate-950\/60,
     .theme-light .bg-slate-900,
     .theme-light .bg-slate-900\/90,
     .theme-light .bg-slate-900\/80,
-    .theme-light .bg-slate-900\/70,
-    .theme-light .bg-slate-900\/60,
-    .theme-light .bg-slate-900\/50,
-    .theme-light .bg-slate-900\/40,
-    .theme-light .bg-slate-900\/30,
-    .theme-light .bg-slate-800\/80,
-    .theme-light .bg-slate-800\/70,
-    .theme-light .bg-slate-800\/60,
-    .theme-light .bg-slate-800\/50,
-    .theme-light .bg-slate-700,
-    .theme-light .bg-slate-700\/50 {
-      background: linear-gradient(145deg, rgba(255,255,255,0.9), rgba(226,232,240,0.76));
-      border: 1px solid rgba(148,163,184,0.32);
-      backdrop-filter: blur(16px) saturate(108%);
-      box-shadow: 0 12px 32px rgba(15,23,42,0.14);
+    .theme-light .bg-slate-900\/70 {
+      background: linear-gradient(145deg, rgba(255,255,255,0.9), rgba(226,232,240,0.76)) !important;
+      border-color: rgba(148,163,184,0.32) !important;
     }
-    .theme-light .border-slate-900\/60,
-    .theme-light .border-slate-900,
     .theme-light .border-slate-800,
-    .theme-light .border-slate-800\/70,
-    .theme-light .border-slate-800\/60,
-    .theme-light .border-slate-800\/50,
     .theme-light .border-slate-700,
-    .theme-light .border-slate-700\/50,
-    .theme-light .border-slate-600 {
+    .theme-light .border-slate-900 {
       border-color: rgba(148,163,184,0.45) !important;
     }
-    .theme-light .bg-slate-800\/70 span,
-    .theme-light .bg-slate-800\/70 strong { color: inherit; }
-
     .theme-light input,
-    .theme-light select,
-    .theme-light textarea {
-      color: #0f172a;
-      background: linear-gradient(120deg, rgba(255,255,255,0.9), rgba(226,232,240,0.82));
+    .theme-light select {
+      color: #0f172a !important;
+      background: rgba(255,255,255,0.9) !important;
       border-color: rgba(148,163,184,0.5) !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 6px 18px rgba(15,23,42,0.08);
     }
 
-    .theme-toggle {
-      background: linear-gradient(135deg, rgba(15,23,42,0.9), rgba(15,23,42,0.78));
-      border: 1px solid rgba(148,163,184,0.3);
-      box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+    .skeleton {
+      background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 8px;
     }
-    .theme-light .theme-toggle {
-      background: linear-gradient(135deg, rgba(255,255,255,0.94), rgba(224,231,255,0.86));
-      box-shadow: 0 14px 32px rgba(59,130,246,0.12);
-      border-color: rgba(148,163,184,0.46);
-      color: #0f172a;
+    @keyframes shimmer { 
+      0% { background-position: 200% 0; } 
+      100% { background-position: -200% 0; } 
+    }
+
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     @media (max-width: 640px) {
@@ -251,6 +182,15 @@
   </style>
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
+
+<!-- Loading Overlay -->
+<div id="loading-overlay" class="fixed inset-0 bg-slate-950 z-[100] flex items-center justify-center transition-opacity duration-500">
+  <div class="text-center">
+    <div class="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+    <p class="text-slate-400">Loading market data...</p>
+  </div>
+</div>
+
 <div class="min-h-screen flex flex-col">
   <!-- HEADER -->
   <header class="border-b border-slate-900/60 glass-surface">
@@ -264,86 +204,57 @@
         </div>
         <div>
           <h1 class="text-base sm:text-lg font-semibold tracking-tight flex items-center gap-2">
-            Minimal Crypto
-            <span class="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-emerald-300">
-              Portfolio
-            </span>
+            Crypto Dashboard
+            <span class="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-emerald-300">Pro</span>
           </h1>
-          <p class="mt-1 text-xs text-slate-400">
-            Clean crypto dashboard with live pricing, TA tools, alerts, risk & news.
-          </p>
+          <p class="mt-0.5 text-xs text-slate-400">Real-time portfolio tracking & analytics</p>
         </div>
       </div>
-      <div class="flex items-center gap-3 text-[11px] sm:text-xs mobile-stack sm:flex-row sm:items-center">
-        <div class="hidden sm:flex items-center gap-2 text-slate-400">
+      <div class="flex flex-wrap items-center gap-3 text-xs">
+        <div class="flex items-center gap-2 text-slate-400">
           <span class="inline-flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span id="price-status">Live prices</span>
-          <span id="price-stale" class="hidden rounded-full border border-amber-500/50 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-200">Stale</span>
+          <span id="price-status">Live</span>
         </div>
-        <div class="hidden sm:flex flex-col items-end text-slate-500">
-          <span class="uppercase tracking-[0.16em] text-[9px]">Updated</span>
+        <div class="flex flex-col items-end text-slate-500">
+          <span class="uppercase tracking-wider text-[9px]">Updated</span>
           <span id="last-updated" class="font-mono text-xs text-slate-300">--</span>
         </div>
-        <div class="flex flex-wrap sm:flex-nowrap items-center justify-start sm:justify-end gap-2 w-full sm:w-auto">
-          <select id="global-currency-select"
-                  class="min-w-[88px] rounded-full border border-slate-700 bg-slate-900/90 px-2 py-1.5 text-[11px] font-medium text-slate-200 focus:outline-none focus:border-emerald-500/70 focus:ring-1 focus:ring-emerald-400/50">
-            <option value="usd" selected>USD</option>
-            <option value="eur">EUR</option>
-            <option value="gbp">GBP</option>
-            <option value="jpy">JPY</option>
-            <option value="aud">AUD</option>
-            <option value="cad">CAD</option>
-          </select>
-          <button id="refresh-btn"
-                  class="inline-flex items-center justify-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[11px] font-semibold hover:border-emerald-400/70 hover:text-emerald-200 transition focus-visible:ring-1 focus-visible:ring-emerald-400/40">
-            <span id="refresh-dot" class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.9)]"></span>
-            Refresh
-          </button>
-          <button id="theme-toggle" type="button"
-                  class="theme-toggle inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold text-slate-100 hover:border-emerald-400/70 hover:text-emerald-200 transition focus-visible:ring-1 focus-visible:ring-emerald-400/40">
-            <span id="theme-dot" class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.9)]"></span>
-            <span id="theme-label">Dark</span>
-          </button>
-        </div>
-        <div class="hidden sm:flex items-center gap-2 text-[10px] text-slate-400">
-          <div class="relative w-44">
-            <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-600">🔑</span>
-            <input id="cg-api-key" type="password" placeholder="CoinGecko API key (demo prefilled)"
-                   class="w-full rounded-full border border-slate-800 bg-slate-900/80 pl-8 pr-3 py-1.5 text-[10px] text-slate-200 placeholder:text-slate-600 focus:border-emerald-400/70 focus:outline-none focus:ring-1 focus:ring-emerald-400/40" />
-          </div>
-          <button id="cg-api-save" class="rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[10px] font-medium hover:border-emerald-400/70 hover:text-emerald-200 focus-visible:ring-1 focus-visible:ring-emerald-400/40">Save</button>
-        </div>
+        <select id="global-currency-select" class="rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-xs font-medium text-slate-200 focus:outline-none focus:border-emerald-500/70">
+          <option value="usd" selected>USD</option>
+          <option value="eur">EUR</option>
+          <option value="gbp">GBP</option>
+        </select>
+        <button id="refresh-btn" class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-xs font-semibold hover:border-emerald-400/70 hover:text-emerald-200 transition cursor-pointer">
+          <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+          Refresh
+        </button>
+        <button id="theme-toggle" type="button" class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-xs font-semibold hover:border-emerald-400/70 transition cursor-pointer">
+          <span id="theme-icon">🌙</span>
+          <span id="theme-label">Dark</span>
+        </button>
       </div>
     </div>
   </header>
 
   <!-- MARKET SENTIMENT STRIP -->
   <div class="border-b border-slate-900/60 glass-surface px-4 py-2">
-    <div class="max-w-screen-xl mx-auto flex flex-wrap items-center justify-between gap-4 text-[10px] sm:text-[11px] px-4 sm:px-6 lg:px-10">
-      <div class="ticker-shell w-full sm:w-auto">
-        <div class="ticker-track">
-          <div class="flex items-center gap-2">
-            <span class="uppercase tracking-widest text-slate-500 font-normal">Fear & Greed</span>
-            <div class="flex items-center gap-1.5">
-              <div id="fng-value" class="font-semibold text-slate-200">--</div>
-              <div id="fng-label" class="text-slate-400">--</div>
-              <div class="h-1.5 w-12 rounded-full bg-slate-800/80 overflow-hidden">
-                 <div id="fng-bar" class="h-full w-0 bg-emerald-400 transition-all duration-500"></div>
-              </div>
-            </div>
+    <div class="max-w-screen-xl mx-auto flex flex-wrap items-center justify-between gap-4 text-xs px-4 sm:px-6 lg:px-10">
+      <div class="flex flex-wrap items-center gap-6">
+        <div class="flex items-center gap-2">
+          <span class="uppercase tracking-widest text-slate-500 text-[10px]">Fear & Greed</span>
+          <span id="fng-value" class="font-semibold text-slate-200">--</span>
+          <span id="fng-label" class="text-slate-400 text-[10px]">--</span>
+          <div class="h-1.5 w-16 rounded-full bg-slate-800/80 overflow-hidden">
+            <div id="fng-bar" class="h-full w-0 bg-emerald-400 transition-all duration-500"></div>
           </div>
-          <div class="flex items-center gap-2">
-            <span class="uppercase tracking-widest text-slate-500 font-normal">BTC Dom</span>
-            <span id="btc-dom" class="font-mono text-slate-200 font-semibold">--%</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="uppercase tracking-widest text-slate-500 font-normal">Altseason</span>
-            <span id="alt-season" class="font-mono text-slate-200 font-semibold">--</span>
-          </div>
-          <div class="hidden sm:flex items-center gap-4 text-slate-500">
-            <div>Global Cap: <span id="global-mcap" class="text-slate-300 font-semibold">--</span></div>
-            <div>Alt Cap <span class="text-[9px] opacity-70">(ex BTC/ETH)</span>: <span id="alt-mcap" class="text-slate-300 font-semibold">--</span></div>
-          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="uppercase tracking-widest text-slate-500 text-[10px]">BTC Dom</span>
+          <span id="btc-dom" class="font-mono text-slate-200 font-semibold">--%</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="uppercase tracking-widest text-slate-500 text-[10px]">Global Cap</span>
+          <span id="global-mcap" class="font-mono text-slate-200 font-semibold">--</span>
         </div>
       </div>
     </div>
@@ -360,12 +271,12 @@
       <section>
         <div class="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-4">
           <!-- Total -->
-          <div class="md:col-span-2 rounded-2xl gradient-border glass-surface px-4 py-4 sm:px-5 sm:py-5 shadow-sm shadow-emerald-500/10">
+          <div class="md:col-span-2 rounded-2xl gradient-border glass-surface px-4 py-4 sm:px-5 sm:py-5">
             <div class="flex items-start justify-between gap-4">
               <div>
-                <p class="text-[11px] font-normal uppercase tracking-[0.18em] text-slate-400">Total balance</p>
+                <p class="text-xs font-normal uppercase tracking-wider text-slate-400">Total Balance</p>
                 <p id="total-value" class="mt-2 text-2xl sm:text-3xl font-bold tracking-tight">$0.00</p>
-                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] sm:text-xs text-slate-400">
+                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400">
                   <div class="flex items-center gap-1.5">
                     <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
                     <span>Cost basis</span>
@@ -374,666 +285,234 @@
                   <div class="flex items-center gap-1.5">
                     <span class="inline-block h-1.5 w-1.5 rounded-full bg-cyan-400"></span>
                     <span>Unrealized P/L</span>
-                    <span id="total-pnl" class="font-mono text-slate-100">--</span>
-                    <span id="total-pnl-pct" class="font-mono text-[11px] text-slate-400"></span>
+                    <span id="total-pnl" class="font-mono text-slate-100">$0.00</span>
+                    <span id="total-pnl-pct" class="font-mono text-xs text-slate-400">(0%)</span>
                   </div>
                 </div>
               </div>
-              <div class="hidden sm:flex flex-col items-end gap-2 text-[11px] text-slate-500">
+              <div class="flex flex-col items-end gap-2 text-xs text-slate-500">
                 <div class="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1.5">
-                  <span class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Assets</span>
+                  <span class="text-[9px] uppercase tracking-wider text-slate-500">Assets</span>
                   <span id="assets-count" class="font-mono text-xs text-slate-100 font-semibold">0</span>
                 </div>
-                <p id="allocation-note" class="max-w-[12rem] text-right">
-                  Keep majors heavy for smoother drawdowns.
-                </p>
               </div>
             </div>
           </div>
           <!-- 24h P/L -->
-          <div class="rounded-2xl glass-surface border border-slate-800 px-4 py-4 sm:px-4.5 sm:py-5">
-            <p class="text-[11px] font-normal uppercase tracking-[0.18em] text-slate-400">24h P/L</p>
+          <div class="rounded-2xl glass-surface border border-slate-800 px-4 py-4">
+            <p class="text-xs font-normal uppercase tracking-wider text-slate-400">24h P/L</p>
             <p id="day-pnl" class="mt-2 text-xl font-bold">$0.00</p>
-            <p id="day-pnl-pct" class="mt-1 text-[11px] font-mono text-slate-400">--</p>
-            <div id="day-spark" class="mt-2 sparkline"></div>
-            <p class="mt-2 text-[11px] text-slate-500">Approx from per-asset 24h moves.</p>
+            <p id="day-pnl-pct" class="mt-1 text-xs font-mono text-slate-400">0%</p>
+            <div id="day-spark" class="mt-2 sparkline" style="--spark-width: 50%"></div>
           </div>
           <!-- Best -->
-          <div class="rounded-2xl glass-surface border border-slate-800 px-4 py-4 sm:px-4.5 sm:py-5">
-            <p class="text-[11px] font-normal uppercase tracking-[0.18em] text-slate-400">Best 24h</p>
-            <p id="best-asset-name" class="mt-2 text-sm font-semibold">--</p>
-            <p id="best-asset-change" class="mt-1 text-[11px] font-mono text-slate-400">--</p>
-            <div id="best-spark" class="mt-2 sparkline"></div>
-            <p class="mt-2 text-[11px] text-slate-500">Ignores tiny positions.</p>
-          </div>
-          <!-- Worst -->
-          <div class="rounded-2xl glass-surface border border-slate-800 px-4 py-4 sm:px-4.5 sm:py-5">
-            <p class="text-[11px] font-normal uppercase tracking-[0.18em] text-slate-400">Worst 24h</p>
-            <p id="worst-asset-name" class="mt-2 text-sm font-semibold">--</p>
-            <p id="worst-asset-change" class="mt-1 text-[11px] font-mono text-slate-400">--</p>
-            <div id="worst-spark" class="mt-2 sparkline"></div>
-            <p class="mt-2 text-[11px] text-slate-500">Helps find what to trim.</p>
+          <div class="rounded-2xl glass-surface border border-slate-800 px-4 py-4">
+            <p class="text-xs font-normal uppercase tracking-wider text-slate-400">Best 24h</p>
+            <p id="best-asset-name" class="mt-2 text-sm font-semibold text-emerald-400">--</p>
+            <p id="best-asset-change" class="mt-1 text-xs font-mono text-emerald-400">--</p>
+            <div id="best-spark" class="mt-2 sparkline" style="--spark-width: 70%"></div>
           </div>
         </div>
       </section>
 
       <!-- MAIN GRID -->
-      <section class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,1.2fr)] items-start">
+      <section class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,1fr)] items-start">
 
         <!-- LEFT COLUMN -->
         <div class="space-y-6 order-2 lg:order-1">
 
-          <!-- PRICE CHART + TA -->
-          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4">
+          <!-- CHART -->
+          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 pt-4 pb-3 sm:px-5">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
               <div>
-                <p class="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Portfolio curve & TA</p>
-                <p class="mt-1 text-[11px] text-slate-500">
-                  Synthetic equity curve (USD base) with indicators, drawing tools & chart types.
-                </p>
+                <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Portfolio Performance</p>
+                <p class="mt-1 text-xs text-slate-500">Synthetic equity curve based on holdings</p>
               </div>
-              <div class="flex flex-col items-end gap-2">
-                <div class="inline-flex rounded-full border border-slate-800/80 bg-slate-950/70 p-1 text-[11px] gap-1 shadow-inner shadow-slate-900/70">
-                  <button type="button" data-timeframe="24h"
-                          class="timeframe-btn rounded-full px-3 py-1 font-semibold text-slate-300 pill-active transition focus-visible:outline-none">
-                    24H
-                  </button>
-                  <button type="button" data-timeframe="7d"
-                          class="timeframe-btn rounded-full px-3 py-1 text-slate-400 hover:text-slate-100 transition">
-                    7D
-                  </button>
-                  <button type="button" data-timeframe="30d"
-                          class="timeframe-btn rounded-full px-3 py-1 text-slate-400 hover:text-slate-100 transition">
-                    30D
-                  </button>
-                </div>
+              <div class="inline-flex rounded-full border border-slate-800/80 bg-slate-950/70 p-1 text-xs gap-1">
+                <button type="button" data-timeframe="24h" class="timeframe-btn rounded-full px-3 py-1 font-semibold pill-active transition cursor-pointer">24H</button>
+                <button type="button" data-timeframe="7d" class="timeframe-btn rounded-full px-3 py-1 text-slate-400 hover:text-slate-100 transition cursor-pointer">7D</button>
+                <button type="button" data-timeframe="30d" class="timeframe-btn rounded-full px-3 py-1 text-slate-400 hover:text-slate-100 transition cursor-pointer">30D</button>
               </div>
             </div>
-
-            <!-- TA Controls -->
-            <div class="mb-3 flex flex-wrap items-center justify-between gap-3 text-[10px] sm:text-[11px]">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="uppercase tracking-[0.18em] text-slate-500">Chart</span>
-                <div class="inline-flex rounded-full border border-slate-700 bg-slate-950/80 p-0.5">
-                  <button type="button" data-chart-type="line"
-                          class="chart-type-btn rounded-full px-2.5 py-1 bg-slate-800 text-slate-100 shadow-[0_0_0_1px_rgba(148,163,184,0.55)]">
-                    Line
-                  </button>
-                  <button type="button" data-chart-type="candles"
-                          class="chart-type-btn rounded-full px-2.5 py-1 text-slate-400 hover:text-slate-100">
-                    Candles
-                  </button>
-                  <button type="button" data-chart-type="bars"
-                          class="chart-type-btn rounded-full px-2.5 py-1 text-slate-400 hover:text-slate-100">
-                    Bars
-                  </button>
-                </div>
-              </div>
-              <div class="flex flex-wrap items-center gap-3">
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="uppercase tracking-[0.18em] text-slate-500">Indicators</span>
-                  <label class="inline-flex items-center gap-1 text-slate-400">
-                    <input id="indicator-bb" type="checkbox"
-                           class="h-3 w-3 rounded border-slate-600 bg-slate-950 text-emerald-500 focus:ring-emerald-500">
-                    <span>BB</span>
-                  </label>
-                  <label class="inline-flex items-center gap-1 text-slate-400">
-                    <input id="indicator-rsi" type="checkbox"
-                           class="h-3 w-3 rounded border-slate-600 bg-slate-950 text-emerald-500 focus:ring-emerald-500">
-                    <span>RSI</span>
-                  </label>
-                  <label class="inline-flex items-center gap-1 text-slate-400">
-                    <input id="indicator-macd" type="checkbox"
-                           class="h-3 w-3 rounded border-slate-600 bg-slate-950 text-emerald-500 focus:ring-emerald-500">
-                    <span>MACD</span>
-                  </label>
-                </div>
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="uppercase tracking-[0.18em] text-slate-500">Draw</span>
-                  <select id="draw-tool-select"
-                          class="rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[11px] text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
-                    <option value="none">None</option>
-                    <option value="trendline">Trendline</option>
-                    <option value="fib">Fib retracement</option>
-                  </select>
-                  <button type="button" id="draw-clear"
-                          class="rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[11px] text-slate-300 hover:border-slate-500 hover:text-slate-100">
-                    Clear
-                  </button>
-                </div>
-              </div>
-            </div>
-
             <div class="relative h-64 sm:h-72">
               <canvas id="performance-chart" class="absolute inset-0 w-full h-full"></canvas>
-              <div id="chart-empty"
-                   class="absolute inset-0 flex items-center justify-center text-[11px] text-slate-500">
-                Add at least one asset to see a simulated curve.
+              <div id="chart-empty" class="absolute inset-0 flex items-center justify-center text-xs text-slate-500">
+                Add at least one asset to see a performance curve.
               </div>
             </div>
-            <p class="mt-2 text-[10px] text-slate-500">
-              Drawing: pick a tool, click once for the first point and again for the second. Fib uses your two points as range.
-            </p>
           </section>
 
-          <!-- ADVANCED METRICS + RISK + HISTORY/SCENARIOS -->
-          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 pt-4 pb-4 sm:px-5 sm:pt-5 sm:pb-5">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <!-- RISK METRICS -->
+          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 pt-4 pb-4 sm:px-5">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div>
-                <h2 class="text-sm font-semibold tracking-tight">Advanced metrics & risk</h2>
-                <p class="mt-1 text-[11px] text-slate-500 max-w-md">
-                  Synthetic stats from the curve plus simple VaR, stress tests, rough correlations and benchmark comparison.
-                </p>
+                <h2 class="text-sm font-semibold tracking-tight">Risk Metrics</h2>
+                <p class="mt-1 text-xs text-slate-500">Portfolio analytics and stress testing</p>
               </div>
-              <span class="rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-400">
-                Quant view
-              </span>
+              <span class="rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] uppercase tracking-wider text-slate-400">Analytics</span>
             </div>
 
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.1fr)] items-start text-[11px] sm:text-xs">
-              <!-- Perf stats -->
-              <div class="space-y-3">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5">
-                    <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Annualized return</p>
-                    <p id="metric-annualized" class="mt-1.5 text-sm font-semibold text-slate-100">--</p>
-                    <p class="mt-0.5 text-[10px] text-slate-500">From curve slope (very rough).</p>
-                  </div>
-                  <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5">
-                    <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Volatility</p>
-                    <p id="metric-volatility" class="mt-1.5 text-sm font-semibold text-slate-100">--</p>
-                    <p class="mt-0.5 text-[10px] text-slate-500">Annualized from daily swings.</p>
-                  </div>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5">
-                    <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Sharpe ratio</p>
-                    <p id="metric-sharpe" class="mt-1.5 text-sm font-semibold text-slate-100">--</p>
-                    <p class="mt-0.5 text-[10px] text-slate-500">Return per unit of risk (r≈0%).</p>
-                  </div>
-                  <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5">
-                    <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Max drawdown</p>
-                    <p id="metric-maxdd" class="mt-1.5 text-sm font-semibold text-slate-100">--</p>
-                    <p class="mt-0.5 text-[10px] text-slate-500">Worst peak-to-trough drop.</p>
-                  </div>
-                </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+              <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5">
+                <p class="uppercase tracking-wider text-[9px] text-slate-500">Volatility</p>
+                <p id="metric-volatility" class="mt-1.5 text-sm font-semibold text-slate-100">--</p>
               </div>
-
-              <!-- VaR + correlations -->
-              <div class="space-y-3">
-                <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5 space-y-1.5">
-                  <div class="flex items-baseline justify-between gap-2">
-                    <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Value at Risk</p>
-                    <span class="text-[10px] text-slate-400">95% · 1d Monte Carlo</span>
-                  </div>
-                  <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                    <p id="metric-var-1d" class="text-sm font-semibold text-slate-100">--</p>
-                    <p id="metric-var-1d-pct" class="text-[11px] font-mono text-slate-400">--</p>
-                  </div>
-                  <p class="text-[10px] text-slate-500">
-                    5-day VaR: <span id="metric-var-5d" class="font-mono text-slate-300">--</span>
-                  </p>
-                  <div class="flex items-center gap-2 mt-1">
-                    <label for="risk-stress-select"
-                           class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Stress</label>
-                    <select id="risk-stress-select"
-                            class="rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[11px] text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
-                      <option value="-0.10">-10% mild</option>
-                      <option value="-0.25" selected>-25% moderate</option>
-                      <option value="-0.40">-40% crash</option>
-                    </select>
-                  </div>
-                  <p class="mt-1 text-[10px] text-slate-500">
-                    Scenario (<span id="risk-stress-label" class="font-mono text-slate-300">-25%</span>):
-                    <span id="risk-stress-summary" class="font-mono text-slate-300">Add holdings to see crash impact.</span>
-                  </p>
-                </div>
-
-                <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5 space-y-1.5">
-                  <div class="flex items-baseline justify-between gap-2">
-                    <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Correlation map</p>
-                    <span class="text-[10px] text-slate-400">Simulated · top assets</span>
-                  </div>
-                  <div id="risk-corr-grid" class="mt-1 text-[9px] text-slate-200">
-                    <p class="text-[10px] text-slate-500">
-                      Add at least two assets to see simulated correlations.
-                    </p>
-                  </div>
-                  <p id="risk-insight-text" class="mt-1 text-[10px] text-slate-500">
-                    We simulate 60 days of returns per coin based on 24h moves. For intuition only.
-                  </p>
-                </div>
+              <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5">
+                <p class="uppercase tracking-wider text-[9px] text-slate-500">Sharpe Ratio</p>
+                <p id="metric-sharpe" class="mt-1.5 text-sm font-semibold text-slate-100">--</p>
+              </div>
+              <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5">
+                <p class="uppercase tracking-wider text-[9px] text-slate-500">Max Drawdown</p>
+                <p id="metric-maxdd" class="mt-1.5 text-sm font-semibold text-rose-400">--</p>
+              </div>
+              <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5">
+                <p class="uppercase tracking-wider text-[9px] text-slate-500">VaR (95%, 1d)</p>
+                <p id="metric-var" class="mt-1.5 text-sm font-semibold text-slate-100">--</p>
               </div>
             </div>
 
-            <!-- HISTORY & SCENARIOS -->
-            <div class="mt-4 border-t border-slate-800 pt-4 grid grid-cols-1 gap-4 md:grid-cols-3 text-[11px] sm:text-xs">
-              
-              <!-- Performance vs indices -->
-              <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-3 space-y-2.5">
-                <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Performance vs indices (rough)</p>
-                <div class="space-y-1.5">
-                  <div class="flex items-center justify-between gap-2">
-                    <span class="text-[10px] text-slate-400">1 month (est.)</span>
-                    <div class="flex items-center gap-3">
-                      <span id="perf-month-portfolio" class="font-mono text-slate-100">--</span>
-                      <span class="text-[10px] text-slate-500">S&amp;P:</span>
-                      <span id="perf-month-sp" class="font-mono text-slate-300">~2%</span>
-                      <span class="text-[10px] text-slate-500">Nasdaq:</span>
-                      <span id="perf-month-nasdaq" class="font-mono text-slate-300">~2.5%</span>
-                    </div>
-                  </div>
-                  <div class="flex items-center justify-between gap-2">
-                    <span class="text-[10px] text-slate-400">3 months (est.)</span>
-                    <div class="flex items-center gap-3">
-                      <span id="perf-quarter-portfolio" class="font-mono text-slate-100">--</span>
-                      <span class="text-[10px] text-slate-500">S&amp;P:</span>
-                      <span id="perf-quarter-sp" class="font-mono text-slate-300">~5%</span>
-                      <span class="text-[10px] text-slate-500">Nasdaq:</span>
-                      <span id="perf-quarter-nasdaq" class="font-mono text-slate-300">~6.5%</span>
-                    </div>
-                  </div>
-                  <div class="flex items-center justify-between gap-2">
-                    <span class="text-[10px] text-slate-400">1 year (est.)</span>
-                    <div class="flex items-center gap-3">
-                      <span id="perf-year-portfolio" class="font-mono text-slate-100">--</span>
-                      <span class="text-[10px] text-slate-500">S&amp;P:</span>
-                      <span id="perf-year-sp" class="font-mono text-slate-300">~8%</span>
-                      <span class="text-[10px] text-slate-500">Nasdaq:</span>
-                      <span id="perf-year-nasdaq" class="font-mono text-slate-300">~11%</span>
-                    </div>
-                  </div>
-                </div>
-                <p class="mt-2 text-[10px] text-slate-500">
-                  Uses your synthetic 30-day curve for portfolio; index numbers are just ballpark long-run averages.
-                </p>
-              </div>
-
-              <!-- Strategy Backtester -->
-              <div class="rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-3 space-y-3">
-                <div class="flex items-baseline justify-between gap-2">
-                  <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Strategy Backtester</p>
-                  <span class="text-[10px] text-slate-400">Simulated (Synthetic)</span>
-                </div>
-                <div class="space-y-2.5">
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div class="space-y-1">
-                      <label class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Strategy</label>
-                      <select id="bt-strategy" class="w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500">
-                        <option value="hold">Buy & Hold</option>
-                        <option value="sma_cross">SMA Cross (20/50)</option>
-                        <option value="rsi_strat">RSI Reversal (30/70)</option>
-                        <option value="bollinger">BB Breakout</option>
-                      </select>
-                    </div>
-                    <div class="space-y-1">
-                      <label class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Period</label>
-                      <select id="bt-period" class="w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500">
-                        <option value="90">90 Days</option>
-                        <option value="180">180 Days</option>
-                        <option value="365" selected>1 Year</option>
-                      </select>
-                    </div>
-                  </div>
-                  <button id="bt-run-btn" type="button" class="w-full rounded-lg bg-indigo-500/90 px-3 py-2 text-xs font-medium text-white shadow-sm shadow-indigo-500/30 hover:bg-indigo-400 transition">
-                    Run Backtest
-                  </button>
-                  
-                  <!-- Results -->
-                  <div id="bt-results" class="hidden space-y-3 pt-2 border-t border-slate-800/50">
-                    <div class="grid grid-cols-3 gap-2 text-center">
-                       <div class="bg-slate-950/50 rounded p-1.5 border border-slate-800/50">
-                         <div class="text-[9px] uppercase tracking-wider text-slate-500">Sharpe</div>
-                         <div id="bt-sharpe" class="text-xs font-mono text-slate-200 mt-0.5">--</div>
-                       </div>
-                       <div class="bg-slate-950/50 rounded p-1.5 border border-slate-800/50">
-                         <div class="text-[9px] uppercase tracking-wider text-slate-500">Sortino</div>
-                         <div id="bt-sortino" class="text-xs font-mono text-slate-200 mt-0.5">--</div>
-                       </div>
-                       <div class="bg-slate-950/50 rounded p-1.5 border border-slate-800/50">
-                         <div class="text-[9px] uppercase tracking-wider text-slate-500">Max DD</div>
-                         <div id="bt-maxdd" class="text-xs font-mono text-rose-300 mt-0.5">--</div>
-                       </div>
-                    </div>
-                    <div class="h-24 w-full bg-slate-900/30 rounded border border-slate-800/50 relative overflow-hidden">
-                        <canvas id="bt-chart" class="absolute inset-0 w-full h-full"></canvas>
-                    </div>
-                    <p class="text-[9px] text-slate-500 text-center leading-relaxed">
-                       <span class="inline-block w-2 h-2 rounded-full bg-indigo-400 mr-1"></span>Strategy
-                       <span class="inline-block w-2 h-2 rounded-full bg-slate-600 ml-2 mr-1"></span>Buy & Hold
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Scenario Modeller -->
-              <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-3 space-y-3">
-                <div class="flex items-baseline justify-between gap-2">
-                  <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Scenario modeller</p>
-                  <span class="text-[10px] text-slate-400">Market shocks</span>
-                </div>
-
-                <form id="scenario-form" class="space-y-2.5">
-                  <div class="space-y-1">
-                    <label for="scenario-amount"
-                           class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Extra capital</label>
-                    <input id="scenario-amount" type="number" min="0" step="100"
-                           placeholder="e.g. 5000"
-                           class="w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500">
-                  </div>
-
-                  <div class="space-y-1">
-                    <label for="scenario-move"
-                           class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Market move</label>
-                    <select id="scenario-move"
-                            class="w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500">
-                      <option value="-0.10">-10% mild risk-off</option>
-                      <option value="-0.25" selected>-25% recession scare</option>
-                      <option value="-0.40">-40% crash</option>
-                      <option value="0.10">+10% relief rally</option>
-                      <option value="0.30">+30% altseason burst</option>
-                    </select>
-                  </div>
-
-                  <button type="submit"
-                          class="w-full rounded-lg bg-emerald-500/90 px-3 py-2 text-xs font-medium text-slate-950 shadow-sm shadow-emerald-500/30 hover:bg-emerald-400 transition">
-                    Run scenario
-                  </button>
-                </form>
-
-                <div class="pt-2 border-t border-slate-800/50 space-y-1.5">
-                  <div class="flex items-center justify-between">
-                    <span class="text-[10px] text-slate-500">Future value</span>
-                    <span id="scenario-result-value" class="font-mono text-xs text-slate-100">--</span>
-                  </div>
-                  <div class="flex items-center justify-between">
-                    <span class="text-[10px] text-slate-500">P/L vs today</span>
-                    <span id="scenario-result-pnl" class="font-mono text-xs text-slate-100">--</span>
-                  </div>
-                  <p id="scenario-note" class="text-[9px] text-slate-500">
-                    Uses a simple linear shock on your current portfolio + extra capital.
-                  </p>
-                </div>
+            <!-- Stress Test -->
+            <div class="mt-4 pt-4 border-t border-slate-800">
+              <div class="flex items-center gap-3 flex-wrap">
+                <span class="text-xs uppercase tracking-wider text-slate-500">Stress Test:</span>
+                <select id="stress-select" class="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-xs text-slate-100 focus:outline-none cursor-pointer">
+                  <option value="-0.10">-10% Correction</option>
+                  <option value="-0.25" selected>-25% Crash</option>
+                  <option value="-0.40">-40% Black Swan</option>
+                </select>
+                <span class="text-xs text-slate-400">Impact: <span id="stress-result" class="font-mono text-rose-400">--</span></span>
               </div>
             </div>
           </section>
 
           <!-- HOLDINGS TABLE -->
-          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4">
-            <div class="flex flex-wrap items-baseline justify-between gap-3">
+          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 pt-4 pb-3 sm:px-5">
+            <div class="flex flex-wrap items-baseline justify-between gap-3 mb-4">
               <div>
-                <h2 class="text-sm font-semibold tracking-tight">Portfolio holdings</h2>
-                <p class="mt-1 text-[11px] text-slate-500">
-                  Aggregated positions and P/L.
-                </p>
+                <h2 class="text-sm font-semibold tracking-tight">Portfolio Holdings</h2>
+                <p class="mt-1 text-xs text-slate-500">Your positions and performance</p>
               </div>
+              <select id="sort-holdings" class="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 text-xs text-slate-100 focus:outline-none cursor-pointer">
+                <option value="value-desc">Value: High → Low</option>
+                <option value="value-asc">Value: Low → High</option>
+                <option value="change-desc">24h: Best First</option>
+                <option value="change-asc">24h: Worst First</option>
+                <option value="name-asc">Name: A → Z</option>
+              </select>
             </div>
-            <div class="mt-3 border-t border-slate-800 pt-3 sm:pt-4">
-              <div id="holdings-cards" class="sm:hidden space-y-2"></div>
-              <div class="hidden sm:block -mx-3 sm:mx-0 overflow-x-auto">
-                <table class="min-w-full border-separate border-spacing-y-1 text-xs sm:text-sm">
-                  <thead class="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-slate-500">
+            <div class="overflow-x-auto -mx-3 sm:mx-0">
+              <table class="min-w-full border-separate border-spacing-y-1 text-xs sm:text-sm">
+                <thead class="text-[10px] uppercase tracking-wider text-slate-500">
                   <tr>
                     <th class="px-3 py-2 text-left font-medium">Asset</th>
-                    <th class="px-3 py-2 text-right font-medium">Amount</th>
                     <th class="px-3 py-2 text-right font-medium">Price</th>
+                    <th class="px-3 py-2 text-right font-medium">24h</th>
+                    <th class="px-3 py-2 text-right font-medium">Holdings</th>
                     <th class="px-3 py-2 text-right font-medium">Value</th>
                     <th class="px-3 py-2 text-right font-medium">P/L</th>
                     <th class="px-3 py-2 text-right font-medium">Alloc</th>
-                    <th class="px-3 py-2 text-right font-medium"></th>
+                    <th class="px-3 py-2 text-center font-medium">Actions</th>
                   </tr>
-                  </thead>
-                  <tbody id="holdings-body"></tbody>
-                </table>
-              </div>
-              <p id="no-holdings" class="mt-3 text-[11px] text-slate-500">
-                No positions yet. Add one in the Add position panel.
-              </p>
+                </thead>
+                <tbody id="holdings-body"></tbody>
+              </table>
             </div>
+            <p id="no-holdings" class="py-8 text-center text-xs text-slate-500">
+              No positions yet. Add one using the form on the right.
+            </p>
           </section>
         </div>
 
         <!-- RIGHT COLUMN -->
         <div class="space-y-6 order-1 lg:order-2">
 
-          <!-- ADD / EDIT POSITION -->
+          <!-- ADD POSITION -->
           <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-5 sm:py-5">
             <header class="flex items-start justify-between gap-3">
               <div>
-                <h2 id="asset-form-title" class="text-sm font-semibold tracking-tight">Add position</h2>
-                <p class="mt-1 text-[11px] text-slate-500">Everything stays local in your browser.</p>
+                <h2 id="asset-form-title" class="text-sm font-semibold tracking-tight">Add Position</h2>
+                <p class="mt-1 text-xs text-slate-500">Data stored locally in your browser</p>
               </div>
-              <span class="hidden sm:inline-flex items-center rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-400">
-                Local only
-              </span>
+              <span class="rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[10px] uppercase tracking-wider text-slate-400">Local</span>
             </header>
-            <form id="asset-form" class="mt-3 space-y-3 text-xs sm:text-sm">
+            <form id="asset-form" class="mt-4 space-y-3 text-sm">
               <div class="space-y-1.5">
-                <label for="asset-select"
-                       class="block text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Asset</label>
-                <input id="asset-search" type="text" placeholder="Search coin..." list="asset-suggestions"
-                       class="w-full mb-1.5 rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
-                <datalist id="asset-suggestions"></datalist>
-                <select id="asset-select"
-                        class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950"></select>
+                <label for="asset-search" class="block text-xs font-medium uppercase tracking-wider text-slate-400">Search Asset</label>
+                <input id="asset-search" type="text" placeholder="Search coins..." class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70">
+                <select id="asset-select" size="5" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-2 py-1 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70"></select>
               </div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="grid grid-cols-2 gap-3">
                 <div class="space-y-1.5">
-                  <label for="asset-amount"
-                         class="block text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Amount</label>
-                  <input id="asset-amount" type="number" min="0" step="0.00000001" placeholder="0.00"
-                         class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+                  <label for="asset-amount" class="block text-xs font-medium uppercase tracking-wider text-slate-400">Amount</label>
+                  <input id="asset-amount" type="number" min="0" step="any" placeholder="0.00" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70">
                 </div>
                 <div class="space-y-1.5">
-                  <label for="asset-buy-price"
-                         class="block text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Buy price</label>
-                  <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <input id="asset-buy-price" type="number" min="0" step="0.01" placeholder="Use market"
-                           class="flex-1 rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
-                    <select id="asset-entry-currency"
-                            class="w-full sm:w-24 rounded-xl border border-slate-700 bg-slate-900/70 px-2 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70">
-                      <option value="usd" selected>USD</option>
-                      <option value="eur">EUR</option>
-                      <option value="gbp">GBP</option>
-                      <option value="jpy">JPY</option>
-                      <option value="aud">AUD</option>
-                      <option value="cad">CAD</option>
-                    </select>
-                  </div>
+                  <label for="asset-buy-price" class="block text-xs font-medium uppercase tracking-wider text-slate-400">Buy Price</label>
+                  <input id="asset-buy-price" type="number" min="0" step="any" placeholder="Market price" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70">
                 </div>
               </div>
-              <p id="asset-form-error" class="text-[11px] text-rose-400 hidden"></p>
-              <button type="submit"
-                      class="w-full inline-flex items-center justify-center rounded-xl bg-emerald-500/90 px-3 py-2.5 text-xs sm:text-sm font-medium text-slate-950 shadow-sm shadow-emerald-500/40 hover:bg-emerald-400 transition">
-                <span id="asset-submit-label">Add position</span>
+              <p id="value-preview" class="text-xs text-slate-500">≈ $0.00</p>
+              <button type="submit" class="w-full rounded-xl bg-emerald-500/90 px-3 py-2.5 text-sm font-medium text-slate-950 shadow-sm shadow-emerald-500/40 hover:bg-emerald-400 transition cursor-pointer">
+                <span id="asset-submit-label">Add Position</span>
               </button>
-              <button type="button" id="asset-cancel-edit"
-                      class="hidden w-full text-[11px] text-slate-400 underline-offset-4 hover:text-slate-200 hover:underline">
-                Cancel editing
-              </button>
-              <p class="text-[11px] text-slate-500">
-                Tip: leave <span class="font-medium">Buy price</span> empty to use current market as cost basis.
-              </p>
+              <button type="button" id="asset-cancel-edit" class="hidden w-full text-xs text-slate-400 hover:text-slate-200 underline cursor-pointer">Cancel Edit</button>
             </form>
           </section>
 
-          <!-- ALLOCATION MINI -->
+          <!-- ALLOCATION -->
           <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-5 sm:py-5">
-            <header class="flex items-center justify-between gap-3">
-              <div>
-                <h2 class="text-sm font-semibold tracking-tight">Allocation</h2>
-                <p class="mt-1 text-[11px] text-slate-500">Where your capital sits.</p>
-              </div>
-              <span class="rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-400">
-                Exposure
-              </span>
+            <header class="flex items-center justify-between gap-3 mb-3">
+              <h2 class="text-sm font-semibold tracking-tight">Allocation</h2>
+              <span class="rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] uppercase tracking-wider text-slate-400">Breakdown</span>
             </header>
-            <div id="allocation-list" class="mt-3 space-y-2 text-xs sm:text-sm"></div>
-            <p id="allocation-empty" class="mt-2 text-[11px] text-slate-500">
-              Once you add assets, you'll see a simple breakdown here.
-            </p>
+            <div id="allocation-list" class="space-y-2 text-sm"></div>
+            <p id="allocation-empty" class="text-xs text-slate-500">Add assets to see allocation breakdown.</p>
+            <div class="mt-4 h-48 relative">
+              <canvas id="allocation-chart"></canvas>
+            </div>
           </section>
 
           <!-- PRICE ALERTS -->
           <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-5 sm:py-5">
-            <header class="flex items-center justify-between gap-3">
+            <header class="flex items-center justify-between gap-3 mb-3">
               <div>
-                <h2 class="text-sm font-semibold tracking-tight">Price alerts</h2>
-                <p class="mt-1 text-[11px] text-slate-500">
-                  Get a toast + sound when a coin hits your level. Alerts stored locally.
+                <h2 class="text-sm font-semibold tracking-tight">Price Alerts</h2>
+                <p class="mt-1 text-xs text-slate-500">Get notified when price targets are hit
                 </p>
               </div>
-              <span class="rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-400">
-                Beep on trigger
-              </span>
             </header>
-            <form id="alerts-form" class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] sm:text-xs items-end">
-              <div class="col-span-1 sm:col-span-2 space-y-1">
-                <label for="alerts-asset"
-                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Asset</label>
-                <select id="alerts-asset"
-                        class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950"></select>
-              </div>
-              <div class="space-y-1">
-                <label for="alerts-direction"
-                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Direction</label>
-                <select id="alerts-direction"
-                        class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+            <form id="alerts-form" class="space-y-2 text-xs">
+              <select id="alerts-asset" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:outline-none"></select>
+              <div class="grid grid-cols-2 gap-2">
+                <select id="alerts-direction" class="rounded-xl border border-slate-700 bg-slate-950/70 px-2 py-2 text-sm text-slate-100 focus:outline-none">
                   <option value="above">Above (≥)</option>
                   <option value="below">Below (≤)</option>
                 </select>
+                <input id="alerts-price" type="number" min="0" step="any" placeholder="Target price" class="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none">
               </div>
-              <div class="space-y-1">
-                <label for="alerts-price"
-                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Target price</label>
-                <input id="alerts-price" type="number" min="0" step="0.0001" placeholder="e.g. 50000"
-                       class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
-              </div>
-              <div class="col-span-1 sm:col-span-2 flex items-center gap-2">
-                <input id="alerts-repeat" type="checkbox" checked
-                       class="h-3.5 w-3.5 rounded border-slate-600 bg-slate-950 text-emerald-500 focus:ring-emerald-500">
-                <label for="alerts-repeat" class="text-[10px] text-slate-400">
-                  Repeat alert (uncheck for one-shot; stays visible after trigger).
-                </label>
-              </div>
-              <div class="col-span-1 sm:col-span-2">
-                <button type="submit"
-                        class="w-full inline-flex items-center justify-center rounded-xl bg-slate-100 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white/90 transition">
-                  Add alert
-                </button>
-              </div>
+              <button type="submit" class="w-full rounded-xl bg-slate-100 px-3 py-2 text-sm font-medium text-slate-950 hover:bg-white/90 transition cursor-pointer">Add Alert</button>
             </form>
-            <div class="mt-3 border-t border-slate-800 pt-3 sm:pt-4">
-              <p id="alerts-empty" class="text-[11px] text-slate-500">No alerts yet. Add one above.</p>
-              <ul id="alerts-list" class="mt-2 space-y-2 text-xs sm:text-sm"></ul>
-            </div>
-          </section>
-
-          <!-- NEWS TICKER -->
-          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-5 sm:py-5">
-            <header class="flex items-center justify-between gap-3">
-              <div>
-                <h2 class="text-sm font-semibold tracking-tight">News ticker</h2>
-                <p class="mt-1 text-[11px] text-slate-500">
-                  Horizontal feed with mini charts; filter by coin.
-                </p>
-              </div>
-              <div class="flex flex-col items-end gap-1">
-                <label for="news-coin-filter"
-                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Filter</label>
-                <select id="news-coin-filter"
-                        class="rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[11px] text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
-                  <option value="all">All</option>
-                </select>
-              </div>
-            </header>
             <div class="mt-3 border-t border-slate-800 pt-3">
-              <div id="news-strip"
-                   class="flex gap-3 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-1">
-                <!-- cards via JS -->
-              </div>
-              <p id="news-empty" class="mt-2 text-[11px] text-slate-500">Loading news…</p>
-            </div>
-          </section>
-
-          <!-- WALLET TRACKER -->
-          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-5 sm:py-5">
-            <header class="flex items-start justify-between gap-3">
-              <div>
-                <h2 class="text-sm font-semibold tracking-tight">Wallet tracker</h2>
-                <p class="mt-1 text-[11px] text-slate-500">
-                  Save blockchain addresses you want to monitor. Stored locally with quick explorer links.
-                </p>
-              </div>
-              <span class="rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-400">
-                Addresses
-              </span>
-            </header>
-            <form id="wallet-form" class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs sm:text-sm items-end">
-              <div class="space-y-1">
-                <label for="wallet-chain"
-                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Chain</label>
-                <select id="wallet-chain"
-                        class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
-                  <option value="ethereum">Ethereum</option>
-                  <option value="bitcoin">Bitcoin</option>
-                  <option value="solana">Solana</option>
-                  <option value="polygon">Polygon</option>
-                  <option value="bsc">BNB Chain</option>
-                </select>
-              </div>
-              <div class="space-y-1 sm:col-span-2">
-                <label for="wallet-address"
-                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Address</label>
-                <input id="wallet-address" type="text" autocomplete="off" spellcheck="false"
-                       placeholder="0x... or bc1..."
-                       class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
-              </div>
-              <div class="space-y-1 sm:col-span-2">
-                <label for="wallet-label"
-                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Label (optional)</label>
-                <input id="wallet-label" type="text" autocomplete="off" maxlength="60"
-                       placeholder="e.g. Cold storage, Trading wallet"
-                       class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
-              </div>
-              <div class="sm:col-span-1">
-                <button type="submit"
-                        class="w-full inline-flex items-center justify-center rounded-xl bg-slate-100 px-3 py-2.5 text-xs sm:text-sm font-medium text-slate-950 hover:bg-white/90 transition">
-                  Track wallet
-                </button>
-              </div>
-            </form>
-            <div class="mt-3 border-t border-slate-800 pt-3 sm:pt-4">
-              <p id="wallet-empty" class="text-[11px] text-slate-500">
-                No wallets saved yet. Add an address above to keep it handy.
-              </p>
-              <ul id="wallet-list" class="mt-1 space-y-2 text-xs sm:text-sm"></ul>
+              <p id="alerts-empty" class="text-xs text-slate-500">No alerts set. Add one above.</p>
+              <ul id="alerts-list" class="space-y-2 text-sm"></ul>
             </div>
           </section>
 
           <!-- WATCHLIST -->
           <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-5 sm:py-5">
-            <header class="flex items-start justify-between gap-3">
+            <header class="flex items-start justify-between gap-3 mb-3">
               <div>
                 <h2 class="text-sm font-semibold tracking-tight">Watchlist</h2>
-                <p class="mt-1 text-[11px] text-slate-500">
-                  Coins you're tracking but not necessarily holding.
-                </p>
+                <p class="mt-1 text-xs text-slate-500">Track coins you're interested in</p>
               </div>
             </header>
-            <form id="watchlist-form" class="mt-3 flex flex-col sm:flex-row gap-2 text-xs sm:text-sm">
-              <select id="watchlist-select"
-                      class="flex-1 rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950"></select>
-              <button type="submit"
-                      class="inline-flex items-center justify-center rounded-xl bg-slate-100 px-3 py-2 text-xs sm:text-sm font-medium text-slate-950 hover:bg-white/90 transition">
-                Add
-              </button>
+            <form id="watchlist-form" class="flex gap-2 text-sm">
+              <select id="watchlist-select" class="flex-1 rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:outline-none"></select>
+              <button type="submit" class="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-white/90 transition cursor-pointer">Add</button>
             </form>
-            <div class="mt-3 border-t border-slate-800 pt-3 sm:pt-4">
-              <p id="watchlist-empty" class="text-[11px] text-slate-500">
-                No watchlist yet. Add one above.
-              </p>
-              <ul id="watchlist-list" class="mt-1 space-y-2 text-xs sm:text-sm"></ul>
+            <div class="mt-3 border-t border-slate-800 pt-3">
+              <p id="watchlist-empty" class="text-xs text-slate-500">No watchlist items yet.</p>
+              <ul id="watchlist-list" class="space-y-2 text-sm"></ul>
             </div>
           </section>
         </div>
@@ -1042,14 +521,991 @@
   </main>
 
   <footer class="border-t border-slate-900 py-4">
-    <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-10 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
-      <p>All data stored locally. Prices via public CoinGecko + CryptoCompare APIs.</p>
-      <p>For experimentation only – not investment advice.</p>
+    <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-10 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+      <p>All data stored locally. Prices simulated for demo.</p>
+      <div class="flex gap-3">
+        <button onclick="exportPortfolio()" class="hover:text-emerald-400 transition cursor-pointer">Export Data</button>
+        <label class="hover:text-emerald-400 transition cursor-pointer">
+          Import Data
+          <input type="file" accept=".json" onchange="importPortfolio(event)" class="hidden">
+        </label>
+        <button onclick="resetAll()" class="hover:text-rose-400 transition cursor-pointer">Reset All</button>
+      </div>
     </div>
   </footer>
 </div>
 
-<script type="module" src="./scripts/main.js"></script>
+<script>
+// ============ CONFIGURATION ============
+const COINS = {
+  'bitcoin': { symbol: 'BTC', name: 'Bitcoin', color: '#F7931A', icon: '₿' },
+  'ethereum': { symbol: 'ETH', name: 'Ethereum', color: '#627EEA', icon: 'Ξ' },
+  'solana': { symbol: 'SOL', name: 'Solana', color: '#14F195', icon: '◎' },
+  'ripple': { symbol: 'XRP', name: 'XRP', color: '#00AAE4', icon: '✕' },
+  'cardano': { symbol: 'ADA', name: 'Cardano', color: '#0033AD', icon: '₳' },
+  'dogecoin': { symbol: 'DOGE', name: 'Dogecoin', color: '#C2A633', icon: 'Ð' },
+  'polkadot': { symbol: 'DOT', name: 'Polkadot', color: '#E6007A', icon: '●' },
+  'chainlink': { symbol: 'LINK', name: 'Chainlink', color: '#2A5ADA', icon: '⬡' },
+  'polygon': { symbol: 'MATIC', name: 'Polygon', color: '#8247E5', icon: '⬡' },
+  'avalanche-2': { symbol: 'AVAX', name: 'Avalanche', color: '#E84142', icon: 'A' },
+  'litecoin': { symbol: 'LTC', name: 'Litecoin', color: '#BFBBBB', icon: 'Ł' },
+  'uniswap': { symbol: 'UNI', name: 'Uniswap', color: '#FF007A', icon: '🦄' },
+  'cosmos': { symbol: 'ATOM', name: 'Cosmos', color: '#2E3148', icon: '⚛' },
+  'stellar': { symbol: 'XLM', name: 'Stellar', color: '#08B5E5', icon: '✴' },
+  'near': { symbol: 'NEAR', name: 'NEAR Protocol', color: '#00C08B', icon: 'N' },
+  'arbitrum': { symbol: 'ARB', name: 'Arbitrum', color: '#28A0F0', icon: 'A' },
+  'optimism': { symbol: 'OP', name: 'Optimism', color: '#FF0420', icon: 'O' },
+  'aptos': { symbol: 'APT', name: 'Aptos', color: '#4CD7D0', icon: 'A' }
+};
 
+// Simulated prices with realistic values
+let prices = {
+  'bitcoin': { usd: 67500, usd_24h_change: 2.45 },
+  'ethereum': { usd: 3520, usd_24h_change: -1.23 },
+  'solana': { usd: 172, usd_24h_change: 8.67 },
+  'ripple': { usd: 0.52, usd_24h_change: 1.12 },
+  'cardano': { usd: 0.46, usd_24h_change: -2.34 },
+  'dogecoin': { usd: 0.125, usd_24h_change: 12.45 },
+  'polkadot': { usd: 7.89, usd_24h_change: -3.21 },
+  'chainlink': { usd: 14.56, usd_24h_change: 4.32 },
+  'polygon': { usd: 0.57, usd_24h_change: -0.87 },
+  'avalanche-2': { usd: 35.67, usd_24h_change: 5.43 },
+  'litecoin': { usd: 84.23, usd_24h_change: 1.87 },
+  'uniswap': { usd: 7.89, usd_24h_change: 2.34 },
+  'cosmos': { usd: 8.45, usd_24h_change: -1.56 },
+  'stellar': { usd: 0.11, usd_24h_change: 0.89 },
+  'near': { usd: 5.23, usd_24h_change: 3.45 },
+  'arbitrum': { usd: 0.82, usd_24h_change: -2.12 },
+  'optimism': { usd: 1.78, usd_24h_change: 1.56 },
+  'aptos': { usd: 8.92, usd_24h_change: 4.78 }
+};
+
+// ============ STATE ============
+let portfolio = JSON.parse(localStorage.getItem('crypto_portfolio')) || [];
+let watchlist = JSON.parse(localStorage.getItem('crypto_watchlist')) || [];
+let alerts = JSON.parse(localStorage.getItem('crypto_alerts')) || [];
+let editingIndex = -1;
+let performanceChart = null;
+let allocationChart = null;
+let currentTimeframe = '24h';
+
+// ============ UTILITIES ============
+function formatCurrency(num, decimals = 2) {
+  if (num >= 1) return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(num);
+  return '$' + num.toFixed(6);
+}
+
+function formatNumber(num) {
+  if (num >= 1) return new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 }).format(num);
+  return num.toFixed(8);
+}
+
+function formatChange(change) {
+  const sign = change >= 0 ? '+' : '';
+  return `${sign}${change.toFixed(2)}%`;
+}
+
+function formatMarketCap(num) {
+  if (num >= 1e12) return `$${(num / 1e12).toFixed(2)}T`;
+  if (num >= 1e9) return `$${(num / 1e9).toFixed(2)}B`;
+  return `$${(num / 1e6).toFixed(2)}M`;
+}
+
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const icons = {
+    success: '✓',
+    error: '✕',
+    info: 'ℹ',
+    warning: '⚠'
+  };
+  const colors = {
+    success: 'text-emerald-400',
+    error: 'text-rose-400',
+    info: 'text-cyan-400',
+    warning: 'text-amber-400'
+  };
+  
+  const toast = document.createElement('div');
+  toast.className = 'toast-modern flex items-center gap-3';
+  toast.innerHTML = `
+    <span class="${colors[type]} text-lg">${icons[type]}</span>
+    <span class="text-sm">${message}</span>
+  `;
+  container.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(100%)';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+function saveData() {
+  localStorage.setItem('crypto_portfolio', JSON.stringify(portfolio));
+  localStorage.setItem('crypto_watchlist', JSON.stringify(watchlist));
+  localStorage.setItem('crypto_alerts', JSON.stringify(alerts));
+}
+
+// ============ PRICE FETCHING ============
+async function fetchPrices() {
+  try {
+    const ids = Object.keys(COINS).join(',');
+    const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`);
+    if (!response.ok) throw new Error('API Error');
+    const data = await response.json();
+    Object.keys(data).forEach(key => {
+      if (prices[key]) {
+        prices[key] = { usd: data[key].usd, usd_24h_change: data[key].usd_24h_change || 0 };
+      }
+    });
+    document.getElementById('price-status').textContent = 'Live';
+  } catch (error) {
+    console.warn('Using simulated prices:', error.message);
+    document.getElementById('price-status').textContent = 'Simulated';
+    // Simulate price movement
+    Object.keys(prices).forEach(key => {
+      const volatility = (Math.random() - 0.5) * 0.02;
+      prices[key].usd *= (1 + volatility);
+      prices[key].usd_24h_change += (Math.random() - 0.5) * 0.5;
+    });
+  }
+  
+  document.getElementById('last-updated').textContent = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+  checkAlerts();
+  updateUI();
+}
+
+// ============ PORTFOLIO MANAGEMENT ============
+function addPosition(coinId, amount, buyPrice) {
+  const existing = portfolio.findIndex(p => p.id === coinId);
+  const price = buyPrice || prices[coinId]?.usd || 0;
+  
+  if (existing >= 0) {
+    // Average the buy price
+    const oldCost = portfolio[existing].amount * portfolio[existing].buyPrice;
+    const newCost = parseFloat(amount) * price;
+    const totalAmount = portfolio[existing].amount + parseFloat(amount);
+    portfolio[existing].buyPrice = (oldCost + newCost) / totalAmount;
+    portfolio[existing].amount = totalAmount;
+  } else {
+    portfolio.push({ 
+      id: coinId, 
+      amount: parseFloat(amount), 
+      buyPrice: price,
+      addedAt: Date.now() 
+    });
+  }
+  saveData();
+  updateUI();
+  showToast(`Added ${COINS[coinId]?.symbol || coinId} to portfolio`, 'success');
+}
+
+function updatePosition(index, amount, buyPrice) {
+  if (portfolio[index]) {
+    portfolio[index].amount = parseFloat(amount);
+    if (buyPrice) portfolio[index].buyPrice = parseFloat(buyPrice);
+    saveData();
+    updateUI();
+    showToast('Position updated', 'success');
+  }
+}
+
+function removePosition(index) {
+  const asset = portfolio[index];
+  if (asset && confirm(`Remove ${COINS[asset.id]?.name || asset.id} from portfolio?`)) {
+    portfolio.splice(index, 1);
+    saveData();
+    updateUI();
+    showToast('Position removed', 'info');
+  }
+}
+
+function editPosition(index) {
+  const asset = portfolio[index];
+  if (!asset) return;
+  
+  editingIndex = index;
+  document.getElementById('asset-search').value = COINS[asset.id]?.name || asset.id;
+  document.getElementById('asset-amount').value = asset.amount;
+  document.getElementById('asset-buy-price').value = asset.buyPrice;
+  document.getElementById('asset-form-title').textContent = 'Edit Position';
+  document.getElementById('asset-submit-label').textContent = 'Update Position';
+  document.getElementById('asset-cancel-edit').classList.remove('hidden');
+  document.getElementById('asset-select').disabled = true;
+  
+  // Scroll to form
+  document.getElementById('asset-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cancelEdit() {
+  editingIndex = -1;
+  document.getElementById('asset-form').reset();
+  document.getElementById('asset-form-title').textContent = 'Add Position';
+  document.getElementById('asset-submit-label').textContent = 'Add Position';
+  document.getElementById('asset-cancel-edit').classList.add('hidden');
+  document.getElementById('asset-select').disabled = false;
+  filterCoins('');
+}
+
+// ============ ALERTS ============
+function addAlert(coinId, direction, targetPrice) {
+  alerts.push({ coinId, direction, targetPrice: parseFloat(targetPrice), triggered: false, createdAt: Date.now() });
+  saveData();
+  renderAlerts();
+  showToast(`Alert set for ${COINS[coinId]?.symbol}`, 'success');
+}
+
+function removeAlert(index) {
+  alerts.splice(index, 1);
+  saveData();
+  renderAlerts();
+}
+
+function checkAlerts() {
+  alerts.forEach((alert, index) => {
+    if (alert.triggered) return;
+    const currentPrice = prices[alert.coinId]?.usd || 0;
+    const triggered = (alert.direction === 'above' && currentPrice >= alert.targetPrice) ||
+                     (alert.direction === 'below' && currentPrice <= alert.targetPrice);
+    if (triggered) {
+      alerts[index].triggered = true;
+      saveData();
+      showToast(`🔔 ${COINS[alert.coinId]?.symbol} hit ${formatCurrency(alert.targetPrice)}!`, 'warning');
+      // Play sound
+      try {
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2JfnVvZ2+DioWAdHF/hYl/c25tbHuEiIN5cG1yf4aGf3RwcHR+hoaAd3Jwcnd/hoR/d3RzdX6Eg4B4');
+        audio.volume = 0.3;
+        audio.play();
+      } catch(e) {}
+    }
+  });
+  renderAlerts();
+}
+
+// ============ WATCHLIST ============
+function addToWatchlist(coinId) {
+  if (!watchlist.includes(coinId)) {
+    watchlist.push(coinId);
+    saveData();
+    renderWatchlist();
+    showToast(`Added ${COINS[coinId]?.symbol} to watchlist`, 'success');
+  }
+}
+
+function removeFromWatchlist(index) {
+  watchlist.splice(index, 1);
+  saveData();
+  renderWatchlist();
+}
+
+// ============ IMPORT/EXPORT ============
+function exportPortfolio() {
+  const data = { 
+    version: 2,
+    exported: new Date().toISOString(), 
+    portfolio, 
+    watchlist, 
+    alerts 
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `crypto-portfolio-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Portfolio exported!', 'success');
+}
+
+function importPortfolio(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.portfolio) portfolio = data.portfolio;
+      if (data.watchlist) watchlist = data.watchlist;
+      if (data.alerts) alerts = data.alerts;
+      saveData();
+      updateUI();
+      showToast(`Imported ${portfolio.length} assets!`, 'success');
+    } catch (err) {
+      showToast('Invalid backup file', 'error');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function resetAll() {
+  if (confirm('⚠️ This will delete all data. Continue?')) {
+    portfolio = [];
+    watchlist = [];
+    alerts = [];
+    saveData();
+    updateUI();
+    showToast('All data reset', 'info');
+  }
+}
+
+// ============ UI RENDERING ============
+function filterCoins(query) {
+  const select = document.getElementById('asset-select');
+  select.innerHTML = '';
+  
+  Object.entries(COINS)
+    .filter(([id, meta]) => {
+      const search = query.toLowerCase();
+      return meta.name.toLowerCase().includes(search) || meta.symbol.toLowerCase().includes(search) || id.includes(search);
+    })
+    .forEach(([id, meta]) => {
+      const price = prices[id]?.usd || 0;
+      const option = document.createElement('option');
+      option.value = id;
+      option.textContent = `${meta.symbol} - ${meta.name} (${formatCurrency(price)})`;
+      option.className = 'py-1';
+      select.appendChild(option);
+    });
+}
+
+function updateValuePreview() {
+  const coinId = document.getElementById('asset-select').value;
+  const amount = parseFloat(document.getElementById('asset-amount').value) || 0;
+  const price = prices[coinId]?.usd || 0;
+  document.getElementById('value-preview').textContent = `≈ ${formatCurrency(amount * price)}`;
+}
+
+function getSortedPortfolio() {
+  const sortBy = document.getElementById('sort-holdings')?.value || 'value-desc';
+  return [...portfolio].map((p, i) => ({...p, originalIndex: i})).sort((a, b) => {
+    const aValue = a.amount * (prices[a.id]?.usd || 0);
+    const bValue = b.amount * (prices[b.id]?.usd || 0);
+    const aChange = prices[a.id]?.usd_24h_change || 0;
+    const bChange = prices[b.id]?.usd_24h_change || 0;
+    const aName = COINS[a.id]?.name || '';
+    const bName = COINS[b.id]?.name || '';
+    
+    switch(sortBy) {
+      case 'value-desc': return bValue - aValue;
+      case 'value-asc': return aValue - bValue;
+      case 'change-desc': return bChange - aChange;
+      case 'change-asc': return aChange - bChange;
+      case 'name-asc': return aName.localeCompare(bName);
+      default: return bValue - aValue;
+    }
+  });
+}
+
+function updateUI() {
+  updateSummary();
+  renderHoldings();
+  renderAllocation();
+  renderWatchlist();
+  renderAlerts();
+  updateCharts();
+  updateRiskMetrics();
+  updateMarketSentiment();
+}
+
+function updateSummary() {
+  let totalValue = 0;
+  let totalCost = 0;
+  let dayPnl = 0;
+  let bestAsset = null, worstAsset = null;
+  let bestChange = -Infinity, worstChange = Infinity;
+
+  portfolio.forEach(asset => {
+    const price = prices[asset.id]?.usd || 0;
+    const change = prices[asset.id]?.usd_24h_change || 0;
+    const value = asset.amount * price;
+    const cost = asset.amount * asset.buyPrice;
+    
+    totalValue += value;
+    totalCost += cost;
+    
+    // Approximate 24h P/L from percentage change
+    const yesterdayValue = value / (1 + change / 100);
+    dayPnl += value - yesterdayValue;
+    
+    if (value > 10 && change > bestChange) { bestChange = change; bestAsset = asset.id; }
+    if (value > 10 && change < worstChange) { worstChange = change; worstAsset = asset.id; }
+  });
+
+  const totalPnl = totalValue - totalCost;
+  const totalPnlPct = totalCost > 0 ? ((totalPnl / totalCost) * 100) : 0;
+  const dayPnlPct = totalValue > 0 ? ((dayPnl / (totalValue - dayPnl)) * 100) : 0;
+
+  document.getElementById('total-value').textContent = formatCurrency(totalValue);
+  document.getElementById('total-cost').textContent = formatCurrency(totalCost);
+  document.getElementById('total-pnl').textContent = (totalPnl >= 0 ? '+' : '') + formatCurrency(totalPnl);
+  document.getElementById('total-pnl').className = `font-mono ${totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+  document.getElementById('total-pnl-pct').textContent = `(${formatChange(totalPnlPct)})`;
+  document.getElementById('assets-count').textContent = portfolio.length;
+  
+  document.getElementById('day-pnl').textContent = (dayPnl >= 0 ? '+' : '') + formatCurrency(dayPnl);
+  document.getElementById('day-pnl').className = `mt-2 text-xl font-bold ${dayPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+  document.getElementById('day-pnl-pct').textContent = formatChange(dayPnlPct);
+  
+  const daySpark = document.getElementById('day-spark');
+  daySpark.style.setProperty('--spark-width', `${Math.min(100, Math.abs(dayPnlPct) * 5 + 30)}%`);
+  daySpark.classList.toggle('negative', dayPnl < 0);
+
+  // Best asset
+  if (bestAsset && COINS[bestAsset]) {
+    document.getElementById('best-asset-name').textContent = COINS[bestAsset].name;
+    document.getElementById('best-asset-change').textContent = formatChange(bestChange);
+  } else {
+    document.getElementById('best-asset-name').textContent = '--';
+    document.getElementById('best-asset-change').textContent = '--';
+  }
+}
+
+function renderHoldings() {
+  const tbody = document.getElementById('holdings-body');
+  const noHoldings = document.getElementById('no-holdings');
+  
+  if (portfolio.length === 0) {
+    tbody.innerHTML = '';
+    noHoldings.classList.remove('hidden');
+    return;
+  }
+  
+  noHoldings.classList.add('hidden');
+  const sorted = getSortedPortfolio();
+  const totalValue = portfolio.reduce((sum, p) => sum + p.amount * (prices[p.id]?.usd || 0), 0);
+  
+  tbody.innerHTML = sorted.map(asset => {
+    const meta = COINS[asset.id];
+    const priceData = prices[asset.id];
+    if (!meta || !priceData) return '';
+
+    const price = priceData.usd;
+    const change = priceData.usd_24h_change || 0;
+    const value = asset.amount * price;
+    const cost = asset.amount * asset.buyPrice;
+    const pnl = value - cost;
+    const pnlPct = cost > 0 ? ((pnl / cost) * 100) : 0;
+    const alloc = totalValue > 0 ? ((value / totalValue) * 100) : 0;
+    const isPositive = change >= 0;
+    const isPnlPositive = pnl >= 0;
+
+    return `
+      <tr class="hover:bg-slate-800/30 transition-colors fade-in">
+        <td class="px-3 py-3">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shadow" style="background: linear-gradient(135deg, ${meta.color}, ${meta.color}99)">
+              ${meta.icon || meta.symbol[0]}
+            </div>
+            <div>
+              <div class="font-semibold text-white">${meta.name}</div>
+              <div class="text-[10px] text-slate-400">${meta.symbol}</div>
+            </div>
+          </div>
+        </td>
+        <td class="px-3 py-3 text-right font-mono text-slate-300">${formatCurrency(price)}</td>
+        <td class="px-3 py-3 text-right">
+          <span class="inline-block px-2 py-0.5 rounded text-xs font-bold ${isPositive ? 'text-emerald-400 bg-emerald-500/10' : 'text-rose-400 bg-rose-500/10'}">
+            ${formatChange(change)}
+          </span>
+        </td>
+        <td class="px-3 py-3 text-right">
+          <div class="font-mono text-white">${formatNumber(asset.amount)}</div>
+          <div class="text-[10px] text-slate-500">${meta.symbol}</div>
+        </td>
+        <td class="px-3 py-3 text-right font-bold text-white">${formatCurrency(value)}</td>
+        <td class="px-3 py-3 text-right">
+          <div class="font-mono ${isPnlPositive ? 'text-emerald-400' : 'text-rose-400'}">${isPnlPositive ? '+' : ''}${formatCurrency(pnl)}</div>
+          <div class="text-[10px] ${isPnlPositive ? 'text-emerald-400/70' : 'text-rose-400/70'}">${formatChange(pnlPct)}</div>
+        </td>
+        <td class="px-3 py-3 text-right">
+          <div class="w-16 ml-auto">
+            <div class="text-[10px] text-slate-400 mb-1">${alloc.toFixed(1)}%</div>
+            <div class="alloc-bar">
+              <div class="alloc-bar-fill" style="width: ${alloc}%; background: ${meta.color}"></div>
+            </div>
+          </div>
+        </td>
+        <td class="px-3 py-3 text-center">
+          <div class="flex justify-center gap-1">
+            <button onclick="editPosition(${asset.originalIndex})" class="p-1.5 text-slate-400 hover:text-blue-400 transition cursor-pointer" title="Edit">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            </button>
+            <button onclick="removePosition(${asset.originalIndex})" class="p-1.5 text-slate-400 hover:text-rose-400 transition cursor-pointer" title="Remove">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderAllocation() {
+  const container = document.getElementById('allocation-list');
+  const empty = document.getElementById('allocation-empty');
+  
+  if (portfolio.length === 0) {
+    container.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  
+  empty.classList.add('hidden');
+  const totalValue = portfolio.reduce((sum, p) => sum + p.amount * (prices[p.id]?.usd || 0), 0);
+  
+  const sorted = [...portfolio]
+    .map(p => ({ ...p, value: p.amount * (prices[p.id]?.usd || 0) }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5);
+  
+  container.innerHTML = sorted.map(asset => {
+    const meta = COINS[asset.id];
+    const alloc = totalValue > 0 ? ((asset.value / totalValue) * 100) : 0;
+    return `
+      <div class="flex items-center gap-3">
+        <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style="background: ${meta.color}30; color: ${meta.color}">
+          ${meta.icon || meta.symbol[0]}
+        </div>
+        <div class="flex-1">
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-xs font-medium text-slate-200">${meta.symbol}</span>
+            <span class="text-xs text-slate-400">${alloc.toFixed(1)}%</span>
+          </div>
+          <div class="alloc-bar">
+            <div class="alloc-bar-fill" style="width: ${alloc}%; background: ${meta.color}"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  // Update allocation chart
+  updateAllocationChart();
+}
+
+function renderAlerts() {
+  const list = document.getElementById('alerts-list');
+  const empty = document.getElementById('alerts-empty');
+  
+  if (alerts.length === 0) {
+    list.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  
+  empty.classList.add('hidden');
+  list.innerHTML = alerts.map((alert, i) => {
+    const meta = COINS[alert.coinId];
+    const currentPrice = prices[alert.coinId]?.usd || 0;
+    const statusClass = alert.triggered ? 'text-amber-400' : 'text-slate-400';
+    return `
+      <li class="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 ${alert.triggered ? 'border border-amber-500/30' : ''}">
+        <div class="flex items-center gap-2">
+          <span class="font-semibold text-slate-100">${meta?.symbol || alert.coinId}</span>
+          <span class="text-xs ${statusClass}">${alert.direction === 'above' ? '≥' : '≤'} ${formatCurrency(alert.targetPrice)}</span>
+          ${alert.triggered ? '<span class="text-[10px] text-amber-400 uppercase">Triggered</span>' : ''}
+        </div>
+        <button onclick="removeAlert(${i})" class="text-slate-500 hover:text-rose-400 transition cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </li>
+    `;
+  }).join('');
+}
+
+function renderWatchlist() {
+  const list = document.getElementById('watchlist-list');
+  const empty = document.getElementById('watchlist-empty');
+  
+  if (watchlist.length === 0) {
+    list.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  
+  empty.classList.add('hidden');
+  list.innerHTML = watchlist.map((coinId, i) => {
+    const meta = COINS[coinId];
+    const priceData = prices[coinId];
+    if (!meta || !priceData) return '';
+    
+    const change = priceData.usd_24h_change || 0;
+    const isPositive = change >= 0;
+    
+    return `
+      <li class="flex items-center justify-between p-2 rounded-lg bg-slate-800/50">
+        <div class="flex items-center gap-2">
+          <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style="background: ${meta.color}30; color: ${meta.color}">
+            ${meta.icon || meta.symbol[0]}
+          </div>
+          <div>
+            <span class="font-medium text-slate-100">${meta.symbol}</span>
+            <span class="text-xs text-slate-400 ml-2">${formatCurrency(priceData.usd)}</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-mono ${isPositive ? 'text-emerald-400' : 'text-rose-400'}">${formatChange(change)}</span>
+          <button onclick="removeFromWatchlist(${i})" class="text-slate-500 hover:text-rose-400 transition cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </li>
+    `;
+  }).join('');
+}
+
+function updateMarketSentiment() {
+  // Simulated Fear & Greed
+  const fng = Math.floor(Math.random() * 30) + 35; // 35-65 range
+  const fngLabels = { 0: 'Extreme Fear', 25: 'Fear', 45: 'Neutral', 55: 'Greed', 75: 'Extreme Greed' };
+  let fngLabel = 'Neutral';
+  Object.entries(fngLabels).forEach(([threshold, label]) => {
+    if (fng >= parseInt(threshold)) fngLabel = label;
+  });
+  
+  document.getElementById('fng-value').textContent = fng;
+  document.getElementById('fng-label').textContent = fngLabel;
+  document.getElementById('fng-bar').style.width = `${fng}%`;
+  
+  // BTC Dominance
+  document.getElementById('btc-dom').textContent = `${(Math.random() * 5 + 52).toFixed(1)}%`;
+  
+  // Global Market Cap
+  document.getElementById('global-mcap').textContent = formatMarketCap(2.5e12 + Math.random() * 0.3e12);
+}
+
+function updateRiskMetrics() {
+  if (portfolio.length === 0) {
+    document.getElementById('metric-volatility').textContent = '--';
+    document.getElementById('metric-sharpe').textContent = '--';
+    document.getElementById('metric-maxdd').textContent = '--';
+    document.getElementById('metric-var').textContent = '--';
+    document.getElementById('stress-result').textContent = '--';
+    return;
+  }
+  
+  // Calculate weighted average volatility (simplified)
+  const totalValue = portfolio.reduce((sum, p) => sum + p.amount * (prices[p.id]?.usd || 0), 0);
+  let weightedVol = 0;
+  
+  portfolio.forEach(asset => {
+    const value = asset.amount * (prices[asset.id]?.usd || 0);
+    const weight = value / totalValue;
+    // Estimate annualized volatility from 24h change
+    const dailyVol = Math.abs(prices[asset.id]?.usd_24h_change || 5) / 100;
+    weightedVol += weight * dailyVol * Math.sqrt(365);
+  });
+  
+  document.getElementById('metric-volatility').textContent = `${(weightedVol * 100).toFixed(1)}%`;
+  
+  // Simplified Sharpe (assuming 0 risk-free rate)
+  const avgReturn = portfolio.reduce((sum, p) => {
+    const change = prices[p.id]?.usd_24h_change || 0;
+    const value = p.amount * (prices[p.id]?.usd || 0);
+    return sum + (change / 100) * (value / totalValue);
+  }, 0);
+  const sharpe = weightedVol > 0 ? (avgReturn * 365) / (weightedVol * 100) : 0;
+  document.getElementById('metric-sharpe').textContent = sharpe.toFixed(2);
+  
+  // Max drawdown (simulated)
+  const maxDD = -(Math.random() * 15 + 10);
+  document.getElementById('metric-maxdd').textContent = `${maxDD.toFixed(1)}%`;
+  
+  // VaR (simplified 95% 1-day)
+  const var95 = totalValue * weightedVol * 1.645 / Math.sqrt(365);
+  document.getElementById('metric-var').textContent = formatCurrency(var95);
+  
+  // Stress test
+  const stressLevel = parseFloat(document.getElementById('stress-select').value);
+  const stressLoss = totalValue * stressLevel;
+  document.getElementById('stress-result').textContent = formatCurrency(stressLoss);
+}
+
+// ============ CHARTS ============
+function updateCharts() {
+  updatePerformanceChart();
+  updateAllocationChart();
+}
+
+function updatePerformanceChart() {
+  const ctx = document.getElementById('performance-chart').getContext('2d');
+  const chartEmpty = document.getElementById('chart-empty');
+  
+  if (portfolio.length === 0) {
+    chartEmpty.classList.remove('hidden');
+    if (performanceChart) {
+      performanceChart.destroy();
+      performanceChart = null;
+    }
+    return;
+  }
+  
+  chartEmpty.classList.add('hidden');
+  
+  // Generate synthetic performance data
+  const points = currentTimeframe === '24h' ? 24 : currentTimeframe === '7d' ? 7 : 30;
+  const totalValue = portfolio.reduce((sum, p) => sum + p.amount * (prices[p.id]?.usd || 0), 0);
+  
+  const labels = [];
+  const data = [];
+  let value = totalValue * (1 - Math.random() * 0.1);
+  
+  for (let i = 0; i < points; i++) {
+    labels.push(currentTimeframe === '24h' ? `${i}h` : `Day ${i + 1}`);
+    value *= (1 + (Math.random() - 0.45) * 0.03);
+    data.push(value);
+  }
+  data[data.length - 1] = totalValue;
+  
+  const isPositive = data[data.length - 1] >= data[0];
+  const gradient = ctx.createLinearGradient(0, 0, 0, 250);
+  if (isPositive) {
+    gradient.addColorStop(0, 'rgba(16, 185, 129, 0.3)');
+    gradient.addColorStop(1, 'rgba(16, 185, 129, 0)');
+  } else {
+    gradient.addColorStop(0, 'rgba(244, 63, 94, 0.3)');
+    gradient.addColorStop(1, 'rgba(244, 63, 94, 0)');
+  }
+  
+  if (performanceChart) {
+    performanceChart.data.labels = labels;
+    performanceChart.data.datasets[0].data = data;
+    performanceChart.data.datasets[0].borderColor = isPositive ? '#10b981' : '#f43f5e';
+    performanceChart.data.datasets[0].backgroundColor = gradient;
+    performanceChart.update();
+  } else {
+    performanceChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data,
+          borderColor: isPositive ? '#10b981' : '#f43f5e',
+          backgroundColor: gradient,
+          borderWidth: 2,
+          fill: true,
+          tension: 0.4,
+          pointRadius: 0,
+          pointHoverRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1e293b',
+            titleColor: '#fff',
+            bodyColor: '#94a3b8',
+            borderColor: '#334155',
+            borderWidth: 1,
+            callbacks: {
+              label: ctx => formatCurrency(ctx.parsed.y)
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: 'rgba(71, 85, 105, 0.2)' },
+            ticks: { color: '#64748b', font: { size: 10 } }
+          },
+          y: {
+            grid: { color: 'rgba(71, 85, 105, 0.2)' },
+            ticks: { 
+              color: '#64748b', 
+              font: { size: 10 },
+              callback: value => formatCurrency(value, 0)
+            }
+          }
+        },
+        interaction: {
+          intersect: false,
+          mode: 'index'
+        }
+      }
+    });
+  }
+}
+
+function updateAllocationChart() {
+  const ctx = document.getElementById('allocation-chart').getContext('2d');
+  
+  if (portfolio.length === 0) {
+    if (allocationChart) {
+      allocationChart.destroy();
+      allocationChart = null;
+    }
+    return;
+  }
+  
+  const labels = portfolio.map(p => COINS[p.id]?.symbol || p.id);
+  const data = portfolio.map(p => p.amount * (prices[p.id]?.usd || 0));
+  const colors = portfolio.map(p => COINS[p.id]?.color || '#6366f1');
+  
+  if (allocationChart) {
+    allocationChart.data.labels = labels;
+    allocationChart.data.datasets[0].data = data;
+    allocationChart.data.datasets[0].backgroundColor = colors;
+    allocationChart.update();
+  } else {
+    allocationChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{
+          data,
+          backgroundColor: colors,
+          borderWidth: 0,
+          hoverOffset: 8
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '60%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              color: '#94a3b8',
+              usePointStyle: true,
+              pointStyle: 'circle',
+              padding: 12,
+              font: { size: 10 }
+            }
+          },
+          tooltip: {
+            backgroundColor: '#1e293b',
+            titleColor: '#fff',
+            bodyColor: '#94a3b8',
+            callbacks: {
+              label: ctx => ` ${ctx.label}: ${formatCurrency(ctx.parsed)}`
+            }
+          }
+        }
+      }
+    });
+  }
+}
+
+// ============ EVENT LISTENERS ============
+document.getElementById('asset-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const coinId = document.getElementById('asset-select').value;
+  const amount = document.getElementById('asset-amount').value;
+  const buyPrice = document.getElementById('asset-buy-price').value;
+  
+  if (!coinId || !amount || parseFloat(amount) <= 0) {
+    showToast('Please enter a valid amount', 'error');
+    return;
+  }
+  
+  if (editingIndex >= 0) {
+    updatePosition(editingIndex, amount, buyPrice);
+    cancelEdit();
+  } else {
+    addPosition(coinId, amount, buyPrice ? parseFloat(buyPrice) : null);
+  }
+  
+  document.getElementById('asset-form').reset();
+  filterCoins('');
+});
+
+document.getElementById('asset-cancel-edit').addEventListener('click', cancelEdit);
+
+document.getElementById('asset-search').addEventListener('input', (e) => filterCoins(e.target.value));
+document.getElementById('asset-select').addEventListener('change', updateValuePreview);
+document.getElementById('asset-amount').addEventListener('input', updateValuePreview);
+
+document.getElementById('alerts-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const coinId = document.getElementById('alerts-asset').value;
+  const direction = document.getElementById('alerts-direction').value;
+  const price = document.getElementById('alerts-price').value;
+  
+  if (!coinId || !price) {
+    showToast('Please fill all fields', 'error');
+    return;
+  }
+  
+  addAlert(coinId, direction, price);
+  document.getElementById('alerts-price').value = '';
+});
+
+document.getElementById('watchlist-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const coinId = document.getElementById('watchlist-select').value;
+  if (coinId) addToWatchlist(coinId);
+});
+
+document.getElementById('sort-holdings').addEventListener('change', renderHoldings);
+document.getElementById('stress-select').addEventListener('change', updateRiskMetrics);
+
+document.querySelectorAll('.timeframe-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('pill-active'));
+    btn.classList.add('pill-active');
+    currentTimeframe = btn.dataset.timeframe;
+    updatePerformanceChart();
+  });
+});
+
+document.getElementById('refresh-btn').addEventListener('click', () => {
+  showToast('Refreshing prices...', 'info');
+  fetchPrices();
+});
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  document.body.classList.toggle('theme-light');
+  const isLight = document.body.classList.contains('theme-light');
+  document.getElementById('theme-icon').textContent = isLight ? '☀️' : '🌙';
+  document.getElementById('theme-label').textContent = isLight ? 'Light' : 'Dark';
+  localStorage.setItem('crypto_theme', isLight ? 'light' : 'dark');
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') cancelEdit();
+  if (e.key === 'n' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    document.getElementById('asset-search').focus();
+  }
+});
+
+// ============ INITIALIZATION ============
+(async function init() {
+  // Load theme
+  if (localStorage.getItem('crypto_theme') === 'light') {
+    document.body.classList.add('theme-light');
+    document.getElementById('theme-icon').textContent = '☀️';
+    document.getElementById('theme-label').textContent = 'Light';
+  }
+  
+  // Populate dropdowns
+  filterCoins('');
+  
+  const alertsAsset = document.getElementById('alerts-asset');
+  const watchlistSelect = document.getElementById('watchlist-select');
+  Object.entries(COINS).forEach(([id, meta]) => {
+    alertsAsset.innerHTML += `<option value="${id}">${meta.symbol} - ${meta.name}</option>`;
+    watchlistSelect.innerHTML += `<option value="${id}">${meta.symbol} - ${meta.name}</option>`;
+  });
+  
+  // Fetch prices and hide loading
+  await fetchPrices();
+  
+  document.getElementById('loading-overlay').classList.add('opacity-0');
+  setTimeout(() => {
+    document.getElementById('loading-overlay').classList.add('hidden');
+  }, 500);
+  
+  // Refresh prices every 30 seconds
+  setInterval(fetchPrices, 30000);
+})();
+</script>
 </body>
 </html>
