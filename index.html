@@ -152,9 +152,9 @@
     }
     .theme-light input,
     .theme-light select {
-      color: #0f172a !important;
-      background: rgba(255,255,255,0.9) !important;
-      border-color: rgba(148,163,184,0.5) !important;
+      color: #0f172a;
+      background: rgba(255,255,255,0.98);
+      border-color: rgba(148,163,184,0.35);
     }
 
     .skeleton {
@@ -765,7 +765,8 @@ function removeAlert(index) {
 function checkAlerts() {
   alerts.forEach((alert, index) => {
     if (alert.triggered) return;
-    const currentPrice = prices[alert.coinId]?.usd || 0;
+    const currentPrice = prices[alert.coinId]?.usd;
+    if (typeof currentPrice !== "number" || currentPrice <= 0) return;
     const triggered = (alert.direction === 'above' && currentPrice >= alert.targetPrice) ||
                      (alert.direction === 'below' && currentPrice <= alert.targetPrice);
     if (triggered) {
@@ -774,7 +775,12 @@ function checkAlerts() {
       showToast(`🔔 ${COINS[alert.coinId]?.symbol} hit ${formatCurrency(alert.targetPrice)}!`, 'warning');
       // Play sound
       try {
-        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2JfnVvZ2+DioWAdHF/hYl/c25tbHuEiIN5cG1yf4aGf3RwcHR+hoaAd3Jwcnd/hoR/d3RzdX6Eg4B4');
+        let audio;
+        try {
+          audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2JfnVvZ2+DioWAdHF/hYl/c25tbHuEiIN5cG1yf4aGf3RwcHR+hoaAd3Jwcnd/hoR/d3RzdX6Eg4B4');
+        } catch(e) {
+          audio = new Audio();
+        }
         audio.volume = 0.3;
         audio.play();
       } catch(e) {}
@@ -825,7 +831,12 @@ function importPortfolio(event) {
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
-      const data = JSON.parse(e.target.result);
+      const raw = JSON.parse(e.target.result);
+      const sanitize = (v) => {
+        if (typeof v === "string") return v.replace(/[<>]/g, "");
+        return v;
+      };
+      const data = JSON.parse(JSON.stringify(raw), sanitize);
       if (data.portfolio) portfolio = data.portfolio;
       if (data.watchlist) watchlist = data.watchlist;
       if (data.alerts) alerts = data.alerts;
@@ -936,7 +947,8 @@ function updateSummary() {
 
   const totalPnl = totalValue - totalCost;
   const totalPnlPct = totalCost > 0 ? ((totalPnl / totalCost) * 100) : 0;
-  const dayPnlPct = totalValue > 0 ? ((dayPnl / (totalValue - dayPnl)) * 100) : 0;
+  const denominator = (totalValue - dayPnl);
+  const dayPnlPct = denominator !== 0 ? ((dayPnl / denominator) * 100) : 0;
 
   document.getElementById('total-value').textContent = formatCurrency(totalValue);
   document.getElementById('total-cost').textContent = formatCurrency(totalCost);
@@ -948,9 +960,11 @@ function updateSummary() {
   document.getElementById('day-pnl').textContent = (dayPnl >= 0 ? '+' : '') + formatCurrency(dayPnl);
   document.getElementById('day-pnl').className = `mt-2 text-xl font-bold ${dayPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
   document.getElementById('day-pnl-pct').textContent = formatChange(dayPnlPct);
-  
+
   const daySpark = document.getElementById('day-spark');
-  daySpark.style.setProperty('--spark-width', `${Math.min(100, Math.abs(dayPnlPct) * 5 + 30)}%`);
+  const safePct = isFinite(dayPnlPct) ? dayPnlPct : 0;
+  const sparkWidth = Math.min(100, Math.abs(safePct) * 5 + 30);
+  daySpark.style.setProperty('--spark-width', `${sparkWidth}%`);
   daySpark.classList.toggle('negative', dayPnl < 0);
 
   // Best asset
@@ -978,9 +992,9 @@ function renderHoldings() {
   const totalValue = portfolio.reduce((sum, p) => sum + p.amount * (prices[p.id]?.usd || 0), 0);
   
   tbody.innerHTML = sorted.map(asset => {
+    if (!COINS[asset.id] || !prices[asset.id]) return '';
     const meta = COINS[asset.id];
     const priceData = prices[asset.id];
-    if (!meta || !priceData) return '';
 
     const price = priceData.usd;
     const change = priceData.usd_24h_change || 0;
@@ -1052,16 +1066,17 @@ function renderAllocation() {
     empty.classList.remove('hidden');
     return;
   }
-  
+
   empty.classList.add('hidden');
+  container.innerHTML = `<p class="text-[10px] text-slate-500 mb-1">Top 5 assets</p>`;
   const totalValue = portfolio.reduce((sum, p) => sum + p.amount * (prices[p.id]?.usd || 0), 0);
-  
+
   const sorted = [...portfolio]
     .map(p => ({ ...p, value: p.amount * (prices[p.id]?.usd || 0) }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 5);
   
-  container.innerHTML = sorted.map(asset => {
+  container.innerHTML += sorted.map(asset => {
     const meta = COINS[asset.id];
     const alloc = totalValue > 0 ? ((asset.value / totalValue) * 100) : 0;
     return `
@@ -1162,8 +1177,11 @@ function updateMarketSentiment() {
   const fng = Math.floor(Math.random() * 30) + 35; // 35-65 range
   const fngLabels = { 0: 'Extreme Fear', 25: 'Fear', 45: 'Neutral', 55: 'Greed', 75: 'Extreme Greed' };
   let fngLabel = 'Neutral';
-  Object.entries(fngLabels).forEach(([threshold, label]) => {
-    if (fng >= parseInt(threshold)) fngLabel = label;
+  const sortedThresholds = Object.keys(fngLabels)
+    .map(Number)
+    .sort((a, b) => a - b);
+  sortedThresholds.forEach(t => {
+    if (fng >= t) fngLabel = fngLabels[t];
   });
   
   document.getElementById('fng-value').textContent = fng;
@@ -1226,8 +1244,10 @@ function updateRiskMetrics() {
 
 // ============ CHARTS ============
 function updateCharts() {
-  updatePerformanceChart();
-  updateAllocationChart();
+  requestAnimationFrame(() => {
+    updatePerformanceChart();
+    updateAllocationChart();
+  });
 }
 
 function updatePerformanceChart() {
@@ -1259,9 +1279,10 @@ function updatePerformanceChart() {
     data.push(value);
   }
   data[data.length - 1] = totalValue;
-  
+
   const isPositive = data[data.length - 1] >= data[0];
-  const gradient = ctx.createLinearGradient(0, 0, 0, 250);
+  const chartHeight = ctx.canvas.clientHeight || 250;
+  const gradient = ctx.createLinearGradient(0, 0, 0, chartHeight);
   if (isPositive) {
     gradient.addColorStop(0, 'rgba(16, 185, 129, 0.3)');
     gradient.addColorStop(1, 'rgba(16, 185, 129, 0)');
@@ -1342,7 +1363,10 @@ function updateAllocationChart() {
     return;
   }
   
-  const labels = portfolio.map(p => COINS[p.id]?.symbol || p.id);
+  const labels = portfolio.map(p => {
+    const s = COINS[p.id]?.symbol;
+    return s && s.length <= 8 ? s : p.id.substring(0, 6);
+  });
   const data = portfolio.map(p => p.amount * (prices[p.id]?.usd || 0));
   const colors = portfolio.map(p => COINS[p.id]?.color || '#6366f1');
   
@@ -1470,10 +1494,6 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') cancelEdit();
-  if (e.key === 'n' && (e.ctrlKey || e.metaKey)) {
-    e.preventDefault();
-    document.getElementById('asset-search').focus();
-  }
 });
 
 // ============ INITIALIZATION ============
@@ -1497,11 +1517,11 @@ document.addEventListener('keydown', (e) => {
   
   // Fetch prices and hide loading
   await fetchPrices();
-  
-  document.getElementById('loading-overlay').classList.add('opacity-0');
-  setTimeout(() => {
-    document.getElementById('loading-overlay').classList.add('hidden');
-  }, 500);
+
+  requestAnimationFrame(() => {
+    document.getElementById('loading-overlay').classList.add('opacity-0');
+    setTimeout(() => document.getElementById('loading-overlay').classList.add('hidden'), 500);
+  });
   
   // Refresh prices every 30 seconds
   setInterval(fetchPrices, 30000);
