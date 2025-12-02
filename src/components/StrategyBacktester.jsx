@@ -1,172 +1,104 @@
 import { useState } from 'react';
-import { Card, Select, InputNumber, Button, Statistic, Row, Col, message, Spin, Divider } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
+import { Card, Select, InputNumber, Button, Statistic, Row, Col, message, Divider } from 'antd';
+import { ArrowUpOutlined, ArrowDownOutlined, ExperimentOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useCrypto } from '../context/crypto-context';
 
 export default function StrategyBacktester() {
   const { crypto } = useCrypto();
-  
-  // CHANGED: Store the whole coin object (we need the symbol 'btc', not just id 'bitcoin')
   const [selectedCoin, setSelectedCoin] = useState(null);
-  const [investmentAmount, setInvestmentAmount] = useState(1000);
-  const [days, setDays] = useState(30);
-  const [result, setResult] = useState(null);
+  const [amount, setAmount] = useState(1000);
+  const [duration, setDuration] = useState(365);
   const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
 
-  const handleRunBacktest = async () => {
-    if (!selectedCoin) {
-      message.warning("Please select a coin first!");
-      return;
-    }
+  const handleRun = async () => {
+    if (!selectedCoin) return message.warning('Select a coin first');
 
     setLoading(true);
     setResult(null);
 
     try {
-      // SOLUTION: Use CryptoCompare API (More reliable for frontend history)
-      // We use the symbol (e.g., BTC) and convert to UpperCase
-      const symbol = selectedCoin.symbol.toUpperCase();
-      
-      const response = await axios.get(
-        `https://min-api.cryptocompare.com/data/v2/histoday`, 
-        {
-            params: {
-                fsym: symbol,
-                tsym: 'USD',
-                limit: days,
-            }
-        }
-      );
+      const sym = selectedCoin.symbol.toUpperCase();
+      const res = await axios.get(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=${sym}&tsym=USD&limit=${duration}`);
 
-      const dataPoints = response.data.Data.Data; // CryptoCompare nests data twice
+      const history = res.data.Data.Data;
+      if (!history.length) throw new Error('No Data');
 
-      if (!dataPoints || dataPoints.length === 0) {
-          throw new Error("No historical data returned");
-      }
+      const startPrice = history[0].close;
+      const endPrice = history[history.length - 1].close;
 
-      // CryptoCompare returns data from Oldest -> Newest
-      const startData = dataPoints[0]; // Price 'days' ago
-      const endData = dataPoints[dataPoints.length - 1]; // Price today
+      const coinCount = amount / startPrice;
+      const finalVal = coinCount * endPrice;
+      const profit = finalVal - amount;
+      const percent = (profit / amount) * 100;
 
-      // Use 'close' price for calculations
-      const startPrice = startData.close;
-      const currentPrice = endData.close;
-
-      if (!startPrice || !currentPrice) {
-          throw new Error("Invalid price data");
-      }
-
-      // Calculate Profit/Loss
-      const coinAmount = investmentAmount / startPrice;
-      const finalValue = coinAmount * currentPrice;
-      const profit = finalValue - investmentAmount;
-      const percentage = ((profit / investmentAmount) * 100);
-
-      setResult({
-        initial: investmentAmount,
-        final: finalValue,
-        profit: profit,
-        percentage: percentage,
-        days: days,
-        startPrice,
-        currentPrice,
-        coinName: selectedCoin.name
-      });
-
-      message.success("Backtest completed!");
-
-    } catch (error) {
-      console.error("Backtest failed:", error);
-      // Improved Error Message
-      message.error(
-        error.response?.status === 429 
-        ? "API Rate Limit Hit. Please wait 1 minute." 
-        : "Could not fetch historical data. Try a major coin like BTC."
-      );
+      setResult({ finalVal, profit, percent, startPrice, endPrice });
+    } catch (err) {
+      message.error('Could not fetch historical data');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Card title="Strategy Backtester (Buy & Hold)" style={{ marginTop: 20 }}>
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
-        
-        {/* CHANGED: Select now stores the whole coin object */}
+    <Card title={<span><ExperimentOutlined /> Strategy Backtester</span>}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
         <Select
-          style={{ width: 200 }}
-          placeholder="Select Coin"
-          onChange={(value) => {
-              const coin = crypto.find((c) => c.id === value);
-              setSelectedCoin(coin);
-          }}
-          options={crypto.map((c) => ({ 
-              label: c.name, 
-              value: c.id // We still use ID for the key, but find the object on change
-          }))}
+          showSearch
+          placeholder="Select Asset"
+          style={{ width: 120 }}
+          options={crypto.map((c) => ({ label: c.name, value: c.id, symbol: c.symbol }))}
+          onChange={(v, opt) => setSelectedCoin(opt)}
         />
-        
         <InputNumber
           addonBefore="$"
           defaultValue={1000}
-          min={1}
-          onChange={setInvestmentAmount}
-          placeholder="Investment"
-          style={{ width: 150 }}
+          onChange={setAmount}
+          style={{ width: 120 }}
         />
-
-        <Select 
-            defaultValue={30} 
-            onChange={setDays}
-            style={{ width: 150 }}
-            options={[
-                { label: 'Last 7 Days', value: 7 },
-                { label: 'Last 30 Days', value: 30 },
-                { label: 'Last 90 Days', value: 90 },
-                { label: 'Last 1 Year', value: 365 },
-            ]}
+        <Select
+          defaultValue={365}
+          onChange={setDuration}
+          style={{ width: 130 }}
+          options={[
+            { label: '1 Month', value: 30 },
+            { label: '3 Months', value: 90 },
+            { label: '1 Year', value: 365 },
+          ]}
         />
-
-        <Button type="primary" onClick={handleRunBacktest} loading={loading}>
-          Run Backtest
-        </Button>
+        <Button type="primary" onClick={handleRun} loading={loading}>Run</Button>
       </div>
 
-      {loading && <div style={{ textAlign: 'center', padding: 20 }}><Spin /></div>}
-
-      {result && !loading && (
-        <div style={{ 
-            background: result.profit >= 0 ? 'rgba(63, 134, 0, 0.05)' : 'rgba(207, 19, 34, 0.05)', 
-            padding: '20px', 
-            borderRadius: '8px',
-            border: `1px solid ${result.profit >= 0 ? '#3f8600' : '#cf1322'}`
-        }}>
+      {result && (
+        <div
+          style={{
+            background: result.profit > 0 ? 'rgba(82, 196, 26, 0.1)' : 'rgba(255, 77, 79, 0.1)',
+            padding: 15,
+            borderRadius: 8,
+            border: `1px solid ${result.profit > 0 ? '#52c41a' : '#ff4d4f'}`,
+          }}
+        >
           <Row gutter={16} style={{ textAlign: 'center' }}>
             <Col span={12}>
-              <Statistic 
-                title={`Value after ${result.days} days`} 
-                value={result.final} 
-                precision={2} 
-                prefix="$" 
-              />
+              <Statistic title="Final Value" value={result.finalVal} precision={2} prefix="$" />
             </Col>
             <Col span={12}>
               <Statistic
-                title="Total Profit / Loss"
-                value={result.percentage}
+                title="Total Return"
+                value={result.percent}
                 precision={2}
-                valueStyle={{ color: result.profit >= 0 ? '#3f8600' : '#cf1322' }}
-                prefix={result.profit >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
                 suffix="%"
+                valueStyle={{ color: result.profit > 0 ? '#52c41a' : '#ff4d4f' }}
+                prefix={result.profit > 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
               />
             </Col>
           </Row>
-          <Divider />
-          <p style={{ textAlign: 'center', margin: 0, color: 'gray' }}>
-            Strategy: If you bought <b>${result.initial}</b> of <b>{result.coinName}</b> {result.days} days ago at <b>${result.startPrice.toFixed(2)}</b>...<br/>
-            You would have <b>${result.final.toFixed(2)}</b> today (Price: ${result.currentPrice.toFixed(2)}).
-          </p>
+          <Divider style={{ margin: '10px 0' }} />
+          <small style={{ color: 'gray', display: 'block', textAlign: 'center' }}>
+            Strategy: Buy & Hold ({duration} days).<br />
+            Buy Price: ${result.startPrice.toFixed(2)} → Sell Price: ${result.endPrice.toFixed(2)}
+          </small>
         </div>
       )}
     </Card>

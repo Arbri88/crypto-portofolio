@@ -1,64 +1,77 @@
 import { useState, useEffect } from 'react';
-import { List, Avatar, Card, Typography, Spin, Tag, Alert } from 'antd';
+import { List, Avatar, Card, Typography, Tag, Spin, Alert } from 'antd';
 import axios from 'axios';
 
 export default function NewsFeed() {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [isError, setIsError] = useState(false);
 
   useEffect(() => {
-    async function getNews() {
+    const fetchNews = async () => {
       try {
-        // TRICK: We use rss2json to convert Cointelegraph's RSS feed to JSON.
-        // This bypasses CORS and API keys completely.
-        const rssUrl = 'https://cointelegraph.com/rss';
-        const response = await axios.get(`https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}`);
-        
-        if (response.data.status === 'ok') {
-            setNews(response.data.items.slice(0, 6)); // Top 6 stories
-        } else {
-            throw new Error("Feed parsing failed");
-        }
-      } catch (err) {
-        console.error("News Error:", err);
-        setError(true);
+        // CryptoCompare News API (Usually allows CORS)
+        const response = await axios.get('https://min-api.cryptocompare.com/data/v2/news/?lang=EN');
+        setNews(response.data.Data.slice(0, 5)); // Top 5 stories
+      } catch (error) {
+        console.error('News API Error:', error);
+        setIsError(true);
       } finally {
         setLoading(false);
       }
-    }
-    getNews();
+    };
+
+    fetchNews();
   }, []);
 
-  if (loading) return <div style={{textAlign:'center', padding: 20}}><Spin /></div>;
-  if (error) return <Alert message="Could not load news feed" type="warning" />;
+  if (loading) return <div style={{ textAlign: 'center', padding: 20 }}><Spin /></div>;
 
   return (
-    <Card title="Market News (CoinTelegraph)">
-      <List
-        itemLayout="horizontal"
-        dataSource={news}
-        renderItem={(item) => (
-          <List.Item>
-            <List.Item.Meta
-              avatar={<Avatar shape="square" size={64} src={item.enclosure?.link || item.thumbnail} />}
-              title={
-                <a href={item.link} target="_blank" rel="noreferrer" style={{ color: '#1890ff' }}>
-                  {item.title}
-                </a>
-              }
-              description={
-                <div>
-                  <Tag color="gold">News</Tag>
-                  <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
-                    {new Date(item.pubDate).toLocaleDateString()}
-                  </Typography.Text>
-                </div>
-              }
-            />
-          </List.Item>
-        )}
-      />
+    <Card
+      title="Crypto News Ticker"
+      style={{ height: '100%', overflow: 'hidden' }}
+      bodyStyle={{ padding: '10px 24px' }}
+    >
+      {isError ? (
+        <Alert message="News unavailable right now" type="warning" showIcon />
+      ) : (
+        <List
+          itemLayout="horizontal"
+          dataSource={news}
+          renderItem={(item) => (
+            <List.Item style={{ padding: '10px 0' }}>
+              <List.Item.Meta
+                avatar={
+                  <Avatar
+                    shape="square"
+                    size={50}
+                    src={item.imageurl}
+                    style={{ borderRadius: '8px' }}
+                  />
+                }
+                title={
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: '14px', fontWeight: 600, lineHeight: '1.2' }}
+                  >
+                    {item.title.length > 60 ? `${item.title.substring(0, 60)}...` : item.title}
+                  </a>
+                }
+                description={
+                  <div style={{ marginTop: 4 }}>
+                    <Tag color="blue" style={{ fontSize: '10px' }}>{item.source_info.name}</Tag>
+                    <Typography.Text type="secondary" style={{ fontSize: '10px' }}>
+                      {new Date(item.published_on * 1000).toLocaleDateString()}
+                    </Typography.Text>
+                  </div>
+                }
+              />
+            </List.Item>
+          )}
+        />
+      )}
     </Card>
   );
 }
