@@ -16,7 +16,15 @@ const postSchemaVal = Joi.object({
 export const getPosts = async (req, res) => {
   try {
     const postMessages = await PostMessage.find();
-    res.status(200).json(postMessages);
+
+    // Convert Decimal128 values to strings for the frontend
+    const formattedPosts = postMessages.map((post) => ({
+      ...post._doc,
+      price: post.price?.toString(),
+      amount: post.amount?.toString(),
+    }));
+
+    res.status(200).json(formattedPosts);
   } catch (error) {
     res.status(404).json({ message: error.message });
   }
@@ -43,8 +51,8 @@ export const createPost = async (req, res) => {
 
   const newPost = new PostMessage({
     ...post,
-    price: safePrice.toString(), // Store as string
-    amount: safeAmount.toString(), // Store as string
+    price: safePrice.toString(), // Stored as Decimal128
+    amount: safeAmount.toString(), // Stored as Decimal128
     creator: req.userId,
     createdAt: new Date().toISOString(),
   });
@@ -63,6 +71,15 @@ export const updatePost = async (req, res) => {
 
   if (!mongoose.Types.ObjectId.isValid(id)) return res.status(404).send('No post with that id');
 
+  const existingPost = await PostMessage.findById(id);
+
+  if (!existingPost) return res.status(404).send('No post with that id');
+
+  // SECURITY FIX: Check ownership
+  if (existingPost.creator !== String(req.userId)) {
+    return res.status(403).json({ message: 'Unauthorized. You can only update your own assets.' });
+  }
+
   const { error } = postSchemaVal.validate({
     title: post.title,
     message: post.message,
@@ -79,7 +96,7 @@ export const updatePost = async (req, res) => {
 
   const updatedPost = await PostMessage.findByIdAndUpdate(
     id,
-    { ...post, price: safePrice.toString(), amount: safeAmount.toString(), _id: id },
+    { ...post, price: safePrice.toString(), amount: safeAmount.toString(), _id: id, creator: existingPost.creator },
     { new: true },
   );
 
@@ -90,6 +107,15 @@ export const deletePost = async (req, res) => {
   const { id } = req.params;
 
   if (!mongoose.Types.ObjectId.isValid(id)) return res.status(404).send('No post with that id');
+
+  const post = await PostMessage.findById(id);
+
+  if (!post) return res.status(404).send('No post with that id');
+
+  // SECURITY FIX: Check ownership
+  if (post.creator !== String(req.userId)) {
+    return res.status(403).json({ message: 'Unauthorized. You can only delete your own assets.' });
+  }
 
   await PostMessage.findByIdAndRemove(id);
 
