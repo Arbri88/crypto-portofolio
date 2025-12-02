@@ -1,33 +1,8 @@
-# Dependencies
 node_modules/
-
-# Build outputs
-dist/
-build/
-
-# Environment files
+server/node_modules/
+client/node_modules/
 .env
-.env.local
-.env.*.local
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
+server/.env
+client/.env
 npm-debug.log*
-
-# Test coverage
-coverage/
-
-# Misc
-*.bak
-*.tmp
+.DS_Store

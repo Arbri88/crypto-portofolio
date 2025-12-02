@@ -1,166 +1,1055 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Track your cryptocurrency portfolio with real-time prices">
-    <meta name="theme-color" content="#4CAF50">
-    
-    <!-- Content Security Policy -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://api.coingecko.com;">
-    
-    <title>Crypto Portfolio Tracker</title>
-    <link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8" />
+  <title>Crypto Portfolio Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    :root { color-scheme: dark; }
+    .theme-light { color-scheme: light; }
+    html, body { max-width: 100%; overflow-x: hidden; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif;
+      font-size: 15px;
+    }
+    body.theme-light {
+      background:
+        radial-gradient(circle at 10% 12%, rgba(59,130,246,0.12), transparent 32%),
+        radial-gradient(circle at 84% 10%, rgba(56,189,248,0.12), transparent 26%),
+        radial-gradient(circle at 18% 82%, rgba(37,99,235,0.08), transparent 28%),
+        radial-gradient(circle at 78% 78%, rgba(59,130,246,0.08), transparent 26%),
+        linear-gradient(135deg, rgba(248,250,252,0.95), rgba(226,232,240,0.88));
+      color: #0f172a;
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: rgba(148,163,184,.6); border-radius: 999px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+
+    /* Make the smallest text classes more legible without touching layout. */
+    .text-[11px] { font-size: 12.5px !important; }
+    .text-[10px] { font-size: 12px !important; }
+    .text-[9px] { font-size: 11px !important; }
+    canvas { display: block; }
+
+    .glass-surface {
+      background: linear-gradient(135deg, rgba(15,23,42,0.82), rgba(15,23,42,0.74));
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.03);
+      backdrop-filter: blur(16px);
+    }
+    .theme-light .glass-surface {
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.85), rgba(241,245,249,0.82)),
+        linear-gradient(120deg, rgba(59,130,246,0.10), rgba(16,185,129,0.08));
+      border: 1px solid rgba(148,163,184,0.36);
+      box-shadow: 0 24px 56px rgba(15,23,42,0.14), inset 0 1px 0 rgba(255,255,255,0.82);
+      backdrop-filter: blur(18px) saturate(112%);
+    }
+    .gradient-border {
+      position: relative;
+      border: 1px solid transparent;
+      background-clip: padding-box;
+    }
+    .gradient-border::before {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(120deg, rgba(16,185,129,0.55), rgba(56,189,248,0.3));
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+    .theme-light .gradient-border::before {
+      background: linear-gradient(120deg, rgba(59,130,246,0.45), rgba(56,189,248,0.35), rgba(16,185,129,0.35));
+    }
+    .pill-active {
+      background: linear-gradient(135deg, rgba(16,185,129,0.24), rgba(56,189,248,0.18));
+      color: #e2e8f0;
+      box-shadow: 0 0 0 1px rgba(16,185,129,0.55), 0 8px 26px rgba(16,185,129,0.08);
+    }
+    .theme-light .pill-active {
+      background: linear-gradient(135deg, rgba(59,130,246,0.14), rgba(16,185,129,0.18));
+      color: #0f172a;
+      box-shadow: 0 0 0 1px rgba(59,130,246,0.35), 0 10px 30px rgba(59,130,246,0.12);
+    }
+    .focus-glow:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 1px rgba(16,185,129,0.55), 0 0 0 6px rgba(16,185,129,0.12);
+      border-color: rgba(16,185,129,0.65) !important;
+    }
+    .theme-light .focus-glow:focus-visible {
+      box-shadow: 0 0 0 1px rgba(59,130,246,0.45), 0 0 0 6px rgba(59,130,246,0.16);
+      border-color: rgba(59,130,246,0.55) !important;
+    }
+    .ticker-shell {
+      overflow: hidden;
+      position: relative;
+    }
+    .ticker-track {
+      display: inline-flex;
+      gap: 1.5rem;
+      animation: ticker 28s linear infinite;
+    }
+    .ticker-shell:hover .ticker-track { animation-play-state: paused; }
+    @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+    .sparkline {
+      position: relative;
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(71,85,105,0.6), rgba(71,85,105,0.2));
+      overflow: hidden;
+    }
+    .theme-light .sparkline {
+      background: linear-gradient(90deg, rgba(226,232,240,0.9), rgba(226,232,240,0.35));
+    }
+    .sparkline::after {
+      content: "";
+      position: absolute;
+      inset: -120% 10% auto 10%;
+      height: 220%;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(16,185,129,0.9), rgba(56,189,248,0.8));
+      filter: drop-shadow(0 0 12px rgba(16,185,129,0.35));
+      transform: rotate(var(--spark-tilt, 0deg));
+      transform-origin: center;
+      transition: transform 200ms ease;
+    }
+    .sparkline.negative::after { background: linear-gradient(135deg, rgba(248,113,113,0.9), rgba(249,115,22,0.8)); }
+    .theme-light .sparkline::after {
+      background: linear-gradient(135deg, rgba(37,99,235,0.9), rgba(16,185,129,0.85));
+      filter: drop-shadow(0 0 12px rgba(37,99,235,0.28));
+    }
+    .theme-light .sparkline.negative::after { background: linear-gradient(135deg, rgba(248,113,113,0.9), rgba(249,115,22,0.85)); }
+
+    .alloc-pie {
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      background: conic-gradient(var(--alloc-color, #22c55e) calc(var(--alloc, 0) * 1%), rgba(148,163,184,0.2) 0);
+      box-shadow: inset 0 0 0 1px rgba(148,163,184,0.25);
+      position: relative;
+    }
+    .alloc-pie::after {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.9);
+      box-shadow: inset 0 0 0 1px rgba(148,163,184,0.25);
+    }
+    .theme-light .alloc-pie::after {
+      background: rgba(255,255,255,0.94);
+      box-shadow: inset 0 0 0 1px rgba(148,163,184,0.35);
+    }
+
+    .toast-modern {
+      position: relative;
+      border-radius: 18px;
+      background: rgba(15,23,42,0.75);
+      border: 1px solid rgba(148,163,184,0.25);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+      padding: 10px 12px;
+    }
+    .toast-modern::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(145deg, rgba(16,185,129,0.55), rgba(56,189,248,0.4));
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+    .theme-light .toast-modern {
+      background: rgba(255,255,255,0.88);
+      border-color: rgba(148,163,184,0.45);
+      box-shadow: 0 18px 40px rgba(15,23,42,0.18);
+      color: #0f172a;
+    }
+    .theme-light .toast-modern::before {
+      background: linear-gradient(145deg, rgba(59,130,246,0.45), rgba(16,185,129,0.35));
+    }
+
+    .theme-light .text-slate-100,
+    .theme-light .text-slate-200 { color: #0f172a !important; }
+    .theme-light .text-slate-300 { color: #334155 !important; }
+    .theme-light .text-slate-400 { color: #475569 !important; }
+    .theme-light .text-slate-500 { color: #64748b !important; }
+
+    .theme-light .bg-slate-950,
+    .theme-light .bg-slate-950\/80,
+    .theme-light .bg-slate-950\/70,
+    .theme-light .bg-slate-950\/50,
+    .theme-light .bg-slate-950\/60,
+    .theme-light .bg-slate-900,
+    .theme-light .bg-slate-900\/90,
+    .theme-light .bg-slate-900\/80,
+    .theme-light .bg-slate-900\/70,
+    .theme-light .bg-slate-900\/60,
+    .theme-light .bg-slate-900\/50,
+    .theme-light .bg-slate-900\/40,
+    .theme-light .bg-slate-900\/30,
+    .theme-light .bg-slate-800\/80,
+    .theme-light .bg-slate-800\/70,
+    .theme-light .bg-slate-800\/60,
+    .theme-light .bg-slate-800\/50,
+    .theme-light .bg-slate-700,
+    .theme-light .bg-slate-700\/50 {
+      background: linear-gradient(145deg, rgba(255,255,255,0.9), rgba(226,232,240,0.76));
+      border: 1px solid rgba(148,163,184,0.32);
+      backdrop-filter: blur(16px) saturate(108%);
+      box-shadow: 0 12px 32px rgba(15,23,42,0.14);
+    }
+    .theme-light .border-slate-900\/60,
+    .theme-light .border-slate-900,
+    .theme-light .border-slate-800,
+    .theme-light .border-slate-800\/70,
+    .theme-light .border-slate-800\/60,
+    .theme-light .border-slate-800\/50,
+    .theme-light .border-slate-700,
+    .theme-light .border-slate-700\/50,
+    .theme-light .border-slate-600 {
+      border-color: rgba(148,163,184,0.45) !important;
+    }
+    .theme-light .bg-slate-800\/70 span,
+    .theme-light .bg-slate-800\/70 strong { color: inherit; }
+
+    .theme-light input,
+    .theme-light select,
+    .theme-light textarea {
+      color: #0f172a;
+      background: linear-gradient(120deg, rgba(255,255,255,0.9), rgba(226,232,240,0.82));
+      border-color: rgba(148,163,184,0.5) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 6px 18px rgba(15,23,42,0.08);
+    }
+
+    .theme-toggle {
+      background: linear-gradient(135deg, rgba(15,23,42,0.9), rgba(15,23,42,0.78));
+      border: 1px solid rgba(148,163,184,0.3);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+    }
+    .theme-light .theme-toggle {
+      background: linear-gradient(135deg, rgba(255,255,255,0.94), rgba(224,231,255,0.86));
+      box-shadow: 0 14px 32px rgba(59,130,246,0.12);
+      border-color: rgba(148,163,184,0.46);
+      color: #0f172a;
+    }
+
+    @media (max-width: 640px) {
+      body { font-size: 14px; }
+      .mobile-stack { flex-direction: column; align-items: flex-start; }
+      .mobile-stack > * { width: 100%; }
+    }
+  </style>
 </head>
-<body>
-    <div class="container">
-        <header>
-            <h1>💰 Crypto Portfolio Tracker</h1>
-            <p class="subtitle">Track your cryptocurrency investments in real-time</p>
-        </header>
-
-        <!-- Error Message Display -->
-        <div id="error-container" class="error-container" role="alert" aria-live="polite" hidden>
-            <span id="error-message"></span>
-            <button type="button" class="error-close" aria-label="Close error message">&times;</button>
+<body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
+<div class="min-h-screen flex flex-col">
+  <!-- HEADER -->
+  <header class="border-b border-slate-900/60 glass-surface">
+    <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-10 py-3.5 flex flex-wrap sm:flex-nowrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="relative flex h-9 w-9 items-center justify-center">
+          <div class="absolute inset-0 rounded-2xl bg-gradient-to-tr from-emerald-500/30 via-cyan-400/10 to-sky-500/40 blur-md opacity-70"></div>
+          <div class="relative flex h-8 w-8 items-center justify-center rounded-2xl border border-emerald-400/60 bg-slate-950/80 ring-1 ring-emerald-400/30">
+            <span class="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.95)] animate-pulse"></span>
+          </div>
         </div>
-
-        <!-- Loading Indicator -->
-        <div id="loading" class="loading" hidden>
-            <div class="spinner" aria-label="Loading"></div>
-            <span>Loading...</span>
+        <div>
+          <h1 class="text-base sm:text-lg font-semibold tracking-tight flex items-center gap-2">
+            Minimal Crypto
+            <span class="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-emerald-300">
+              Portfolio
+            </span>
+          </h1>
+          <p class="mt-1 text-xs text-slate-400">
+            Clean crypto dashboard with live pricing, TA tools, alerts, risk & news.
+          </p>
         </div>
+      </div>
+      <div class="flex items-center gap-3 text-[11px] sm:text-xs mobile-stack sm:flex-row sm:items-center">
+        <div class="hidden sm:flex items-center gap-2 text-slate-400">
+          <span class="inline-flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="price-status">Live prices</span>
+          <span id="price-stale" class="hidden rounded-full border border-amber-500/50 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-200">Stale</span>
+        </div>
+        <div class="hidden sm:flex flex-col items-end text-slate-500">
+          <span class="uppercase tracking-[0.16em] text-[9px]">Updated</span>
+          <span id="last-updated" class="font-mono text-xs text-slate-300">--</span>
+        </div>
+        <div class="flex flex-wrap sm:flex-nowrap items-center justify-start sm:justify-end gap-2 w-full sm:w-auto">
+          <select id="global-currency-select"
+                  class="min-w-[88px] rounded-full border border-slate-700 bg-slate-900/90 px-2 py-1.5 text-[11px] font-medium text-slate-200 focus:outline-none focus:border-emerald-500/70 focus:ring-1 focus:ring-emerald-400/50">
+            <option value="usd" selected>USD</option>
+            <option value="eur">EUR</option>
+            <option value="gbp">GBP</option>
+            <option value="jpy">JPY</option>
+            <option value="aud">AUD</option>
+            <option value="cad">CAD</option>
+          </select>
+          <button id="refresh-btn"
+                  class="inline-flex items-center justify-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[11px] font-semibold hover:border-emerald-400/70 hover:text-emerald-200 transition focus-visible:ring-1 focus-visible:ring-emerald-400/40">
+            <span id="refresh-dot" class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.9)]"></span>
+            Refresh
+          </button>
+          <button id="theme-toggle" type="button"
+                  class="theme-toggle inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold text-slate-100 hover:border-emerald-400/70 hover:text-emerald-200 transition focus-visible:ring-1 focus-visible:ring-emerald-400/40">
+            <span id="theme-dot" class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.9)]"></span>
+            <span id="theme-label">Dark</span>
+          </button>
+        </div>
+        <div class="hidden sm:flex items-center gap-2 text-[10px] text-slate-400">
+          <div class="relative w-44">
+            <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-600">🔑</span>
+            <input id="cg-api-key" type="password" placeholder="CoinGecko API key (demo prefilled)"
+                   class="w-full rounded-full border border-slate-800 bg-slate-900/80 pl-8 pr-3 py-1.5 text-[10px] text-slate-200 placeholder:text-slate-600 focus:border-emerald-400/70 focus:outline-none focus:ring-1 focus:ring-emerald-400/40" />
+          </div>
+          <button id="cg-api-save" class="rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-[10px] font-medium hover:border-emerald-400/70 hover:text-emerald-200 focus-visible:ring-1 focus-visible:ring-emerald-400/40">Save</button>
+        </div>
+      </div>
+    </div>
+  </header>
 
-        <!-- Add Crypto Form -->
-        <section class="add-crypto-section" aria-labelledby="add-crypto-heading">
-            <h2 id="add-crypto-heading" class="visually-hidden">Add Cryptocurrency</h2>
-            <form id="crypto-form" class="crypto-form" novalidate>
-                <div class="form-group">
-                    <label for="crypto-select">Cryptocurrency</label>
-                    <select id="crypto-select" required aria-required="true">
-                        <option value="">-- Select Crypto --</option>
-                        <option value="bitcoin">Bitcoin (BTC)</option>
-                        <option value="ethereum">Ethereum (ETH)</option>
-                        <option value="binancecoin">Binance Coin (BNB)</option>
-                        <option value="cardano">Cardano (ADA)</option>
-                        <option value="solana">Solana (SOL)</option>
-                        <option value="ripple">XRP (XRP)</option>
-                        <option value="polkadot">Polkadot (DOT)</option>
-                        <option value="dogecoin">Dogecoin (DOGE)</option>
-                        <option value="avalanche-2">Avalanche (AVAX)</option>
-                        <option value="chainlink">Chainlink (LINK)</option>
+  <!-- MARKET SENTIMENT STRIP -->
+  <div class="border-b border-slate-900/60 glass-surface px-4 py-2">
+    <div class="max-w-screen-xl mx-auto flex flex-wrap items-center justify-between gap-4 text-[10px] sm:text-[11px] px-4 sm:px-6 lg:px-10">
+      <div class="ticker-shell w-full sm:w-auto">
+        <div class="ticker-track">
+          <div class="flex items-center gap-2">
+            <span class="uppercase tracking-widest text-slate-500 font-normal">Fear & Greed</span>
+            <div class="flex items-center gap-1.5">
+              <div id="fng-value" class="font-semibold text-slate-200">--</div>
+              <div id="fng-label" class="text-slate-400">--</div>
+              <div class="h-1.5 w-12 rounded-full bg-slate-800/80 overflow-hidden">
+                 <div id="fng-bar" class="h-full w-0 bg-emerald-400 transition-all duration-500"></div>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="uppercase tracking-widest text-slate-500 font-normal">BTC Dom</span>
+            <span id="btc-dom" class="font-mono text-slate-200 font-semibold">--%</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="uppercase tracking-widest text-slate-500 font-normal">Altseason</span>
+            <span id="alt-season" class="font-mono text-slate-200 font-semibold">--</span>
+          </div>
+          <div class="hidden sm:flex items-center gap-4 text-slate-500">
+            <div>Global Cap: <span id="global-mcap" class="text-slate-300 font-semibold">--</span></div>
+            <div>Alt Cap <span class="text-[9px] opacity-70">(ex BTC/ETH)</span>: <span id="alt-mcap" class="text-slate-300 font-semibold">--</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toasts -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2 max-w-xs"></div>
+
+  <!-- MAIN -->
+  <main class="flex-1">
+    <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-8 space-y-6 sm:space-y-8">
+
+      <!-- SUMMARY STRIP -->
+      <section>
+        <div class="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-4">
+          <!-- Total -->
+          <div class="md:col-span-2 rounded-2xl gradient-border glass-surface px-4 py-4 sm:px-5 sm:py-5 shadow-sm shadow-emerald-500/10">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-[11px] font-normal uppercase tracking-[0.18em] text-slate-400">Total balance</p>
+                <p id="total-value" class="mt-2 text-2xl sm:text-3xl font-bold tracking-tight">$0.00</p>
+                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] sm:text-xs text-slate-400">
+                  <div class="flex items-center gap-1.5">
+                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                    <span>Cost basis</span>
+                    <span id="total-cost" class="font-mono text-slate-100">$0.00</span>
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-cyan-400"></span>
+                    <span>Unrealized P/L</span>
+                    <span id="total-pnl" class="font-mono text-slate-100">--</span>
+                    <span id="total-pnl-pct" class="font-mono text-[11px] text-slate-400"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="hidden sm:flex flex-col items-end gap-2 text-[11px] text-slate-500">
+                <div class="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1.5">
+                  <span class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Assets</span>
+                  <span id="assets-count" class="font-mono text-xs text-slate-100 font-semibold">0</span>
+                </div>
+                <p id="allocation-note" class="max-w-[12rem] text-right">
+                  Keep majors heavy for smoother drawdowns.
+                </p>
+              </div>
+            </div>
+          </div>
+          <!-- 24h P/L -->
+          <div class="rounded-2xl glass-surface border border-slate-800 px-4 py-4 sm:px-4.5 sm:py-5">
+            <p class="text-[11px] font-normal uppercase tracking-[0.18em] text-slate-400">24h P/L</p>
+            <p id="day-pnl" class="mt-2 text-xl font-bold">$0.00</p>
+            <p id="day-pnl-pct" class="mt-1 text-[11px] font-mono text-slate-400">--</p>
+            <div id="day-spark" class="mt-2 sparkline"></div>
+            <p class="mt-2 text-[11px] text-slate-500">Approx from per-asset 24h moves.</p>
+          </div>
+          <!-- Best -->
+          <div class="rounded-2xl glass-surface border border-slate-800 px-4 py-4 sm:px-4.5 sm:py-5">
+            <p class="text-[11px] font-normal uppercase tracking-[0.18em] text-slate-400">Best 24h</p>
+            <p id="best-asset-name" class="mt-2 text-sm font-semibold">--</p>
+            <p id="best-asset-change" class="mt-1 text-[11px] font-mono text-slate-400">--</p>
+            <div id="best-spark" class="mt-2 sparkline"></div>
+            <p class="mt-2 text-[11px] text-slate-500">Ignores tiny positions.</p>
+          </div>
+          <!-- Worst -->
+          <div class="rounded-2xl glass-surface border border-slate-800 px-4 py-4 sm:px-4.5 sm:py-5">
+            <p class="text-[11px] font-normal uppercase tracking-[0.18em] text-slate-400">Worst 24h</p>
+            <p id="worst-asset-name" class="mt-2 text-sm font-semibold">--</p>
+            <p id="worst-asset-change" class="mt-1 text-[11px] font-mono text-slate-400">--</p>
+            <div id="worst-spark" class="mt-2 sparkline"></div>
+            <p class="mt-2 text-[11px] text-slate-500">Helps find what to trim.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- MAIN GRID -->
+      <section class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,1.2fr)] items-start">
+
+        <!-- LEFT COLUMN -->
+        <div class="space-y-6 order-2 lg:order-1">
+
+          <!-- PRICE CHART + TA -->
+          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <div>
+                <p class="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Portfolio curve & TA</p>
+                <p class="mt-1 text-[11px] text-slate-500">
+                  Synthetic equity curve (USD base) with indicators, drawing tools & chart types.
+                </p>
+              </div>
+              <div class="flex flex-col items-end gap-2">
+                <div class="inline-flex rounded-full border border-slate-800/80 bg-slate-950/70 p-1 text-[11px] gap-1 shadow-inner shadow-slate-900/70">
+                  <button type="button" data-timeframe="24h"
+                          class="timeframe-btn rounded-full px-3 py-1 font-semibold text-slate-300 pill-active transition focus-visible:outline-none">
+                    24H
+                  </button>
+                  <button type="button" data-timeframe="7d"
+                          class="timeframe-btn rounded-full px-3 py-1 text-slate-400 hover:text-slate-100 transition">
+                    7D
+                  </button>
+                  <button type="button" data-timeframe="30d"
+                          class="timeframe-btn rounded-full px-3 py-1 text-slate-400 hover:text-slate-100 transition">
+                    30D
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- TA Controls -->
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-3 text-[10px] sm:text-[11px]">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="uppercase tracking-[0.18em] text-slate-500">Chart</span>
+                <div class="inline-flex rounded-full border border-slate-700 bg-slate-950/80 p-0.5">
+                  <button type="button" data-chart-type="line"
+                          class="chart-type-btn rounded-full px-2.5 py-1 bg-slate-800 text-slate-100 shadow-[0_0_0_1px_rgba(148,163,184,0.55)]">
+                    Line
+                  </button>
+                  <button type="button" data-chart-type="candles"
+                          class="chart-type-btn rounded-full px-2.5 py-1 text-slate-400 hover:text-slate-100">
+                    Candles
+                  </button>
+                  <button type="button" data-chart-type="bars"
+                          class="chart-type-btn rounded-full px-2.5 py-1 text-slate-400 hover:text-slate-100">
+                    Bars
+                  </button>
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-3">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="uppercase tracking-[0.18em] text-slate-500">Indicators</span>
+                  <label class="inline-flex items-center gap-1 text-slate-400">
+                    <input id="indicator-bb" type="checkbox"
+                           class="h-3 w-3 rounded border-slate-600 bg-slate-950 text-emerald-500 focus:ring-emerald-500">
+                    <span>BB</span>
+                  </label>
+                  <label class="inline-flex items-center gap-1 text-slate-400">
+                    <input id="indicator-rsi" type="checkbox"
+                           class="h-3 w-3 rounded border-slate-600 bg-slate-950 text-emerald-500 focus:ring-emerald-500">
+                    <span>RSI</span>
+                  </label>
+                  <label class="inline-flex items-center gap-1 text-slate-400">
+                    <input id="indicator-macd" type="checkbox"
+                           class="h-3 w-3 rounded border-slate-600 bg-slate-950 text-emerald-500 focus:ring-emerald-500">
+                    <span>MACD</span>
+                  </label>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="uppercase tracking-[0.18em] text-slate-500">Draw</span>
+                  <select id="draw-tool-select"
+                          class="rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[11px] text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+                    <option value="none">None</option>
+                    <option value="trendline">Trendline</option>
+                    <option value="fib">Fib retracement</option>
+                  </select>
+                  <button type="button" id="draw-clear"
+                          class="rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[11px] text-slate-300 hover:border-slate-500 hover:text-slate-100">
+                    Clear
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="relative h-64 sm:h-72">
+              <canvas id="performance-chart" class="absolute inset-0 w-full h-full"></canvas>
+              <div id="chart-empty"
+                   class="absolute inset-0 flex items-center justify-center text-[11px] text-slate-500">
+                Add at least one asset to see a simulated curve.
+              </div>
+            </div>
+            <p class="mt-2 text-[10px] text-slate-500">
+              Drawing: pick a tool, click once for the first point and again for the second. Fib uses your two points as range.
+            </p>
+          </section>
+
+          <!-- ADVANCED METRICS + RISK + HISTORY/SCENARIOS -->
+          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 pt-4 pb-4 sm:px-5 sm:pt-5 sm:pb-5">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <div>
+                <h2 class="text-sm font-semibold tracking-tight">Advanced metrics & risk</h2>
+                <p class="mt-1 text-[11px] text-slate-500 max-w-md">
+                  Synthetic stats from the curve plus simple VaR, stress tests, rough correlations and benchmark comparison.
+                </p>
+              </div>
+              <span class="rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-400">
+                Quant view
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.1fr)] items-start text-[11px] sm:text-xs">
+              <!-- Perf stats -->
+              <div class="space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5">
+                    <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Annualized return</p>
+                    <p id="metric-annualized" class="mt-1.5 text-sm font-semibold text-slate-100">--</p>
+                    <p class="mt-0.5 text-[10px] text-slate-500">From curve slope (very rough).</p>
+                  </div>
+                  <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5">
+                    <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Volatility</p>
+                    <p id="metric-volatility" class="mt-1.5 text-sm font-semibold text-slate-100">--</p>
+                    <p class="mt-0.5 text-[10px] text-slate-500">Annualized from daily swings.</p>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5">
+                    <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Sharpe ratio</p>
+                    <p id="metric-sharpe" class="mt-1.5 text-sm font-semibold text-slate-100">--</p>
+                    <p class="mt-0.5 text-[10px] text-slate-500">Return per unit of risk (r≈0%).</p>
+                  </div>
+                  <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5">
+                    <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Max drawdown</p>
+                    <p id="metric-maxdd" class="mt-1.5 text-sm font-semibold text-slate-100">--</p>
+                    <p class="mt-0.5 text-[10px] text-slate-500">Worst peak-to-trough drop.</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- VaR + correlations -->
+              <div class="space-y-3">
+                <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5 space-y-1.5">
+                  <div class="flex items-baseline justify-between gap-2">
+                    <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Value at Risk</p>
+                    <span class="text-[10px] text-slate-400">95% · 1d Monte Carlo</span>
+                  </div>
+                  <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                    <p id="metric-var-1d" class="text-sm font-semibold text-slate-100">--</p>
+                    <p id="metric-var-1d-pct" class="text-[11px] font-mono text-slate-400">--</p>
+                  </div>
+                  <p class="text-[10px] text-slate-500">
+                    5-day VaR: <span id="metric-var-5d" class="font-mono text-slate-300">--</span>
+                  </p>
+                  <div class="flex items-center gap-2 mt-1">
+                    <label for="risk-stress-select"
+                           class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Stress</label>
+                    <select id="risk-stress-select"
+                            class="rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[11px] text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+                      <option value="-0.10">-10% mild</option>
+                      <option value="-0.25" selected>-25% moderate</option>
+                      <option value="-0.40">-40% crash</option>
                     </select>
-                    <span class="error-text" id="crypto-select-error" role="alert"></span>
+                  </div>
+                  <p class="mt-1 text-[10px] text-slate-500">
+                    Scenario (<span id="risk-stress-label" class="font-mono text-slate-300">-25%</span>):
+                    <span id="risk-stress-summary" class="font-mono text-slate-300">Add holdings to see crash impact.</span>
+                  </p>
                 </div>
 
-                <div class="form-group">
-                    <label for="amount">Amount</label>
-                    <input 
-                        type="number" 
-                        id="amount" 
-                        placeholder="0.00" 
-                        step="any" 
-                        min="0.00000001"
-                        required 
-                        aria-required="true"
-                        aria-describedby="amount-help amount-error"
-                    >
-                    <small id="amount-help" class="help-text">Enter the amount you own</small>
-                    <span class="error-text" id="amount-error" role="alert"></span>
+                <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5 space-y-1.5">
+                  <div class="flex items-baseline justify-between gap-2">
+                    <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Correlation map</p>
+                    <span class="text-[10px] text-slate-400">Simulated · top assets</span>
+                  </div>
+                  <div id="risk-corr-grid" class="mt-1 text-[9px] text-slate-200">
+                    <p class="text-[10px] text-slate-500">
+                      Add at least two assets to see simulated correlations.
+                    </p>
+                  </div>
+                  <p id="risk-insight-text" class="mt-1 text-[10px] text-slate-500">
+                    We simulate 60 days of returns per coin based on 24h moves. For intuition only.
+                  </p>
                 </div>
-
-                <div class="form-group">
-                    <label for="purchase-price">Purchase Price (USD) <span class="optional">(Optional)</span></label>
-                    <input 
-                        type="number" 
-                        id="purchase-price" 
-                        placeholder="0.00" 
-                        step="any" 
-                        min="0"
-                        aria-describedby="purchase-price-help"
-                    >
-                    <small id="purchase-price-help" class="help-text">Price when you bought</small>
-                </div>
-
-                <button type="submit" class="btn btn-primary" id="add-btn">
-                    <span class="btn-text">Add to Portfolio</span>
-                    <span class="btn-loading" hidden>Adding...</span>
-                </button>
-            </form>
-        </section>
-
-        <!-- Portfolio Summary -->
-        <section class="portfolio-summary" aria-labelledby="summary-heading">
-            <h2 id="summary-heading">Portfolio Summary</h2>
-            <div class="summary-cards">
-                <div class="summary-card">
-                    <span class="summary-label">Total Value</span>
-                    <span class="summary-value" id="total-value">$0.00</span>
-                </div>
-                <div class="summary-card">
-                    <span class="summary-label">Total Profit/Loss</span>
-                    <span class="summary-value" id="total-profit">$0.00</span>
-                </div>
-                <div class="summary-card">
-                    <span class="summary-label">Assets</span>
-                    <span class="summary-value" id="total-assets">0</span>
-                </div>
-            </div>
-        </section>
-
-        <!-- Portfolio Table -->
-        <section class="portfolio-section" aria-labelledby="portfolio-heading">
-            <div class="section-header">
-                <h2 id="portfolio-heading">Your Portfolio</h2>
-                <button type="button" class="btn btn-secondary" id="refresh-btn" aria-label="Refresh prices">
-                    🔄 Refresh Prices
-                </button>
+              </div>
             </div>
 
-            <div class="table-container">
-                <table class="portfolio-table" aria-describedby="portfolio-heading">
-                    <thead>
-                        <tr>
-                            <th scope="col">Cryptocurrency</th>
-                            <th scope="col">Amount</th>
-                            <th scope="col">Current Price</th>
-                            <th scope="col">Total Value</th>
-                            <th scope="col">Profit/Loss</th>
-                            <th scope="col">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="portfolio-body">
-                        <!-- Dynamic content will be inserted here -->
-                    </tbody>
+            <!-- HISTORY & SCENARIOS -->
+            <div class="mt-4 border-t border-slate-800 pt-4 grid grid-cols-1 gap-4 md:grid-cols-3 text-[11px] sm:text-xs">
+              
+              <!-- Performance vs indices -->
+              <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-3 space-y-2.5">
+                <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Performance vs indices (rough)</p>
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-[10px] text-slate-400">1 month (est.)</span>
+                    <div class="flex items-center gap-3">
+                      <span id="perf-month-portfolio" class="font-mono text-slate-100">--</span>
+                      <span class="text-[10px] text-slate-500">S&amp;P:</span>
+                      <span id="perf-month-sp" class="font-mono text-slate-300">~2%</span>
+                      <span class="text-[10px] text-slate-500">Nasdaq:</span>
+                      <span id="perf-month-nasdaq" class="font-mono text-slate-300">~2.5%</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-[10px] text-slate-400">3 months (est.)</span>
+                    <div class="flex items-center gap-3">
+                      <span id="perf-quarter-portfolio" class="font-mono text-slate-100">--</span>
+                      <span class="text-[10px] text-slate-500">S&amp;P:</span>
+                      <span id="perf-quarter-sp" class="font-mono text-slate-300">~5%</span>
+                      <span class="text-[10px] text-slate-500">Nasdaq:</span>
+                      <span id="perf-quarter-nasdaq" class="font-mono text-slate-300">~6.5%</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-[10px] text-slate-400">1 year (est.)</span>
+                    <div class="flex items-center gap-3">
+                      <span id="perf-year-portfolio" class="font-mono text-slate-100">--</span>
+                      <span class="text-[10px] text-slate-500">S&amp;P:</span>
+                      <span id="perf-year-sp" class="font-mono text-slate-300">~8%</span>
+                      <span class="text-[10px] text-slate-500">Nasdaq:</span>
+                      <span id="perf-year-nasdaq" class="font-mono text-slate-300">~11%</span>
+                    </div>
+                  </div>
+                </div>
+                <p class="mt-2 text-[10px] text-slate-500">
+                  Uses your synthetic 30-day curve for portfolio; index numbers are just ballpark long-run averages.
+                </p>
+              </div>
+
+              <!-- Strategy Backtester -->
+              <div class="rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-3 space-y-3">
+                <div class="flex items-baseline justify-between gap-2">
+                  <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Strategy Backtester</p>
+                  <span class="text-[10px] text-slate-400">Simulated (Synthetic)</span>
+                </div>
+                <div class="space-y-2.5">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div class="space-y-1">
+                      <label class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Strategy</label>
+                      <select id="bt-strategy" class="w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                        <option value="hold">Buy & Hold</option>
+                        <option value="sma_cross">SMA Cross (20/50)</option>
+                        <option value="rsi_strat">RSI Reversal (30/70)</option>
+                        <option value="bollinger">BB Breakout</option>
+                      </select>
+                    </div>
+                    <div class="space-y-1">
+                      <label class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Period</label>
+                      <select id="bt-period" class="w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                        <option value="90">90 Days</option>
+                        <option value="180">180 Days</option>
+                        <option value="365" selected>1 Year</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button id="bt-run-btn" type="button" class="w-full rounded-lg bg-indigo-500/90 px-3 py-2 text-xs font-medium text-white shadow-sm shadow-indigo-500/30 hover:bg-indigo-400 transition">
+                    Run Backtest
+                  </button>
+                  
+                  <!-- Results -->
+                  <div id="bt-results" class="hidden space-y-3 pt-2 border-t border-slate-800/50">
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                       <div class="bg-slate-950/50 rounded p-1.5 border border-slate-800/50">
+                         <div class="text-[9px] uppercase tracking-wider text-slate-500">Sharpe</div>
+                         <div id="bt-sharpe" class="text-xs font-mono text-slate-200 mt-0.5">--</div>
+                       </div>
+                       <div class="bg-slate-950/50 rounded p-1.5 border border-slate-800/50">
+                         <div class="text-[9px] uppercase tracking-wider text-slate-500">Sortino</div>
+                         <div id="bt-sortino" class="text-xs font-mono text-slate-200 mt-0.5">--</div>
+                       </div>
+                       <div class="bg-slate-950/50 rounded p-1.5 border border-slate-800/50">
+                         <div class="text-[9px] uppercase tracking-wider text-slate-500">Max DD</div>
+                         <div id="bt-maxdd" class="text-xs font-mono text-rose-300 mt-0.5">--</div>
+                       </div>
+                    </div>
+                    <div class="h-24 w-full bg-slate-900/30 rounded border border-slate-800/50 relative overflow-hidden">
+                        <canvas id="bt-chart" class="absolute inset-0 w-full h-full"></canvas>
+                    </div>
+                    <p class="text-[9px] text-slate-500 text-center leading-relaxed">
+                       <span class="inline-block w-2 h-2 rounded-full bg-indigo-400 mr-1"></span>Strategy
+                       <span class="inline-block w-2 h-2 rounded-full bg-slate-600 ml-2 mr-1"></span>Buy & Hold
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Scenario Modeller -->
+              <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-3 space-y-3">
+                <div class="flex items-baseline justify-between gap-2">
+                  <p class="uppercase tracking-[0.18em] text-[9px] text-slate-500">Scenario modeller</p>
+                  <span class="text-[10px] text-slate-400">Market shocks</span>
+                </div>
+
+                <form id="scenario-form" class="space-y-2.5">
+                  <div class="space-y-1">
+                    <label for="scenario-amount"
+                           class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Extra capital</label>
+                    <input id="scenario-amount" type="number" min="0" step="100"
+                           placeholder="e.g. 5000"
+                           class="w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                  </div>
+
+                  <div class="space-y-1">
+                    <label for="scenario-move"
+                           class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Market move</label>
+                    <select id="scenario-move"
+                            class="w-full rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                      <option value="-0.10">-10% mild risk-off</option>
+                      <option value="-0.25" selected>-25% recession scare</option>
+                      <option value="-0.40">-40% crash</option>
+                      <option value="0.10">+10% relief rally</option>
+                      <option value="0.30">+30% altseason burst</option>
+                    </select>
+                  </div>
+
+                  <button type="submit"
+                          class="w-full rounded-lg bg-emerald-500/90 px-3 py-2 text-xs font-medium text-slate-950 shadow-sm shadow-emerald-500/30 hover:bg-emerald-400 transition">
+                    Run scenario
+                  </button>
+                </form>
+
+                <div class="pt-2 border-t border-slate-800/50 space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[10px] text-slate-500">Future value</span>
+                    <span id="scenario-result-value" class="font-mono text-xs text-slate-100">--</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-[10px] text-slate-500">P/L vs today</span>
+                    <span id="scenario-result-pnl" class="font-mono text-xs text-slate-100">--</span>
+                  </div>
+                  <p id="scenario-note" class="text-[9px] text-slate-500">
+                    Uses a simple linear shock on your current portfolio + extra capital.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- HOLDINGS TABLE -->
+          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4">
+            <div class="flex flex-wrap items-baseline justify-between gap-3">
+              <div>
+                <h2 class="text-sm font-semibold tracking-tight">Portfolio holdings</h2>
+                <p class="mt-1 text-[11px] text-slate-500">
+                  Aggregated positions and P/L.
+                </p>
+              </div>
+            </div>
+            <div class="mt-3 border-t border-slate-800 pt-3 sm:pt-4">
+              <div id="holdings-cards" class="sm:hidden space-y-2"></div>
+              <div class="hidden sm:block -mx-3 sm:mx-0 overflow-x-auto">
+                <table class="min-w-full border-separate border-spacing-y-1 text-xs sm:text-sm">
+                  <thead class="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                  <tr>
+                    <th class="px-3 py-2 text-left font-medium">Asset</th>
+                    <th class="px-3 py-2 text-right font-medium">Amount</th>
+                    <th class="px-3 py-2 text-right font-medium">Price</th>
+                    <th class="px-3 py-2 text-right font-medium">Value</th>
+                    <th class="px-3 py-2 text-right font-medium">P/L</th>
+                    <th class="px-3 py-2 text-right font-medium">Alloc</th>
+                    <th class="px-3 py-2 text-right font-medium"></th>
+                  </tr>
+                  </thead>
+                  <tbody id="holdings-body"></tbody>
                 </table>
-
-                <!-- Empty State -->
-                <div id="empty-state" class="empty-state">
-                    <p>📊 Your portfolio is empty</p>
-                    <p>Add your first cryptocurrency above to get started!</p>
-                </div>
+              </div>
+              <p id="no-holdings" class="mt-3 text-[11px] text-slate-500">
+                No positions yet. Add one in the Add position panel.
+              </p>
             </div>
-        </section>
-
-        <!-- Last Updated -->
-        <footer class="footer">
-            <p>Last updated: <time id="last-updated">Never</time></p>
-            <p>Data provided by <a href="https://www.coingecko.com/" target="_blank" rel="noopener noreferrer">CoinGecko API</a></p>
-        </footer>
-    </div>
-
-    <!-- Confirmation Modal -->
-    <div id="confirm-modal" class="modal" role="dialog" aria-labelledby="modal-title" aria-modal="true" hidden>
-        <div class="modal-content">
-            <h3 id="modal-title">Confirm Deletion</h3>
-            <p id="modal-message">Are you sure you want to remove this item?</p>
-            <div class="modal-actions">
-                <button type="button" class="btn btn-secondary" id="modal-cancel">Cancel</button>
-                <button type="button" class="btn btn-danger" id="modal-confirm">Delete</button>
-            </div>
+          </section>
         </div>
-    </div>
 
-    <script src="js/script.js"></script>
+        <!-- RIGHT COLUMN -->
+        <div class="space-y-6 order-1 lg:order-2">
+
+          <!-- ADD / EDIT POSITION -->
+          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-5 sm:py-5">
+            <header class="flex items-start justify-between gap-3">
+              <div>
+                <h2 id="asset-form-title" class="text-sm font-semibold tracking-tight">Add position</h2>
+                <p class="mt-1 text-[11px] text-slate-500">Everything stays local in your browser.</p>
+              </div>
+              <span class="hidden sm:inline-flex items-center rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-400">
+                Local only
+              </span>
+            </header>
+            <form id="asset-form" class="mt-3 space-y-3 text-xs sm:text-sm">
+              <div class="space-y-1.5">
+                <label for="asset-select"
+                       class="block text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Asset</label>
+                <input id="asset-search" type="text" placeholder="Search coin..." list="asset-suggestions"
+                       class="w-full mb-1.5 rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+                <datalist id="asset-suggestions"></datalist>
+                <select id="asset-select"
+                        class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950"></select>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="space-y-1.5">
+                  <label for="asset-amount"
+                         class="block text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Amount</label>
+                  <input id="asset-amount" type="number" min="0" step="0.00000001" placeholder="0.00"
+                         class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+                </div>
+                <div class="space-y-1.5">
+                  <label for="asset-buy-price"
+                         class="block text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Buy price</label>
+                  <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <input id="asset-buy-price" type="number" min="0" step="0.01" placeholder="Use market"
+                           class="flex-1 rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+                    <select id="asset-entry-currency"
+                            class="w-full sm:w-24 rounded-xl border border-slate-700 bg-slate-900/70 px-2 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70">
+                      <option value="usd" selected>USD</option>
+                      <option value="eur">EUR</option>
+                      <option value="gbp">GBP</option>
+                      <option value="jpy">JPY</option>
+                      <option value="aud">AUD</option>
+                      <option value="cad">CAD</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <p id="asset-form-error" class="text-[11px] text-rose-400 hidden"></p>
+              <button type="submit"
+                      class="w-full inline-flex items-center justify-center rounded-xl bg-emerald-500/90 px-3 py-2.5 text-xs sm:text-sm font-medium text-slate-950 shadow-sm shadow-emerald-500/40 hover:bg-emerald-400 transition">
+                <span id="asset-submit-label">Add position</span>
+              </button>
+              <button type="button" id="asset-cancel-edit"
+                      class="hidden w-full text-[11px] text-slate-400 underline-offset-4 hover:text-slate-200 hover:underline">
+                Cancel editing
+              </button>
+              <p class="text-[11px] text-slate-500">
+                Tip: leave <span class="font-medium">Buy price</span> empty to use current market as cost basis.
+              </p>
+            </form>
+          </section>
+
+          <!-- ALLOCATION MINI -->
+          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-5 sm:py-5">
+            <header class="flex items-center justify-between gap-3">
+              <div>
+                <h2 class="text-sm font-semibold tracking-tight">Allocation</h2>
+                <p class="mt-1 text-[11px] text-slate-500">Where your capital sits.</p>
+              </div>
+              <span class="rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-400">
+                Exposure
+              </span>
+            </header>
+            <div id="allocation-list" class="mt-3 space-y-2 text-xs sm:text-sm"></div>
+            <p id="allocation-empty" class="mt-2 text-[11px] text-slate-500">
+              Once you add assets, you'll see a simple breakdown here.
+            </p>
+          </section>
+
+          <!-- PRICE ALERTS -->
+          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-5 sm:py-5">
+            <header class="flex items-center justify-between gap-3">
+              <div>
+                <h2 class="text-sm font-semibold tracking-tight">Price alerts</h2>
+                <p class="mt-1 text-[11px] text-slate-500">
+                  Get a toast + sound when a coin hits your level. Alerts stored locally.
+                </p>
+              </div>
+              <span class="rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-400">
+                Beep on trigger
+              </span>
+            </header>
+            <form id="alerts-form" class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] sm:text-xs items-end">
+              <div class="col-span-1 sm:col-span-2 space-y-1">
+                <label for="alerts-asset"
+                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Asset</label>
+                <select id="alerts-asset"
+                        class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950"></select>
+              </div>
+              <div class="space-y-1">
+                <label for="alerts-direction"
+                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Direction</label>
+                <select id="alerts-direction"
+                        class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+                  <option value="above">Above (≥)</option>
+                  <option value="below">Below (≤)</option>
+                </select>
+              </div>
+              <div class="space-y-1">
+                <label for="alerts-price"
+                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Target price</label>
+                <input id="alerts-price" type="number" min="0" step="0.0001" placeholder="e.g. 50000"
+                       class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+              </div>
+              <div class="col-span-1 sm:col-span-2 flex items-center gap-2">
+                <input id="alerts-repeat" type="checkbox" checked
+                       class="h-3.5 w-3.5 rounded border-slate-600 bg-slate-950 text-emerald-500 focus:ring-emerald-500">
+                <label for="alerts-repeat" class="text-[10px] text-slate-400">
+                  Repeat alert (uncheck for one-shot; stays visible after trigger).
+                </label>
+              </div>
+              <div class="col-span-1 sm:col-span-2">
+                <button type="submit"
+                        class="w-full inline-flex items-center justify-center rounded-xl bg-slate-100 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white/90 transition">
+                  Add alert
+                </button>
+              </div>
+            </form>
+            <div class="mt-3 border-t border-slate-800 pt-3 sm:pt-4">
+              <p id="alerts-empty" class="text-[11px] text-slate-500">No alerts yet. Add one above.</p>
+              <ul id="alerts-list" class="mt-2 space-y-2 text-xs sm:text-sm"></ul>
+            </div>
+          </section>
+
+          <!-- NEWS TICKER -->
+          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-5 sm:py-5">
+            <header class="flex items-center justify-between gap-3">
+              <div>
+                <h2 class="text-sm font-semibold tracking-tight">News ticker</h2>
+                <p class="mt-1 text-[11px] text-slate-500">
+                  Horizontal feed with mini charts; filter by coin.
+                </p>
+              </div>
+              <div class="flex flex-col items-end gap-1">
+                <label for="news-coin-filter"
+                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Filter</label>
+                <select id="news-coin-filter"
+                        class="rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[11px] text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+                  <option value="all">All</option>
+                </select>
+              </div>
+            </header>
+            <div class="mt-3 border-t border-slate-800 pt-3">
+              <div id="news-strip"
+                   class="flex gap-3 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-1">
+                <!-- cards via JS -->
+              </div>
+              <p id="news-empty" class="mt-2 text-[11px] text-slate-500">Loading news…</p>
+            </div>
+          </section>
+
+          <!-- WALLET TRACKER -->
+          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-5 sm:py-5">
+            <header class="flex items-start justify-between gap-3">
+              <div>
+                <h2 class="text-sm font-semibold tracking-tight">Wallet tracker</h2>
+                <p class="mt-1 text-[11px] text-slate-500">
+                  Save blockchain addresses you want to monitor. Stored locally with quick explorer links.
+                </p>
+              </div>
+              <span class="rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-400">
+                Addresses
+              </span>
+            </header>
+            <form id="wallet-form" class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs sm:text-sm items-end">
+              <div class="space-y-1">
+                <label for="wallet-chain"
+                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Chain</label>
+                <select id="wallet-chain"
+                        class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+                  <option value="ethereum">Ethereum</option>
+                  <option value="bitcoin">Bitcoin</option>
+                  <option value="solana">Solana</option>
+                  <option value="polygon">Polygon</option>
+                  <option value="bsc">BNB Chain</option>
+                </select>
+              </div>
+              <div class="space-y-1 sm:col-span-2">
+                <label for="wallet-address"
+                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Address</label>
+                <input id="wallet-address" type="text" autocomplete="off" spellcheck="false"
+                       placeholder="0x... or bc1..."
+                       class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+              </div>
+              <div class="space-y-1 sm:col-span-2">
+                <label for="wallet-label"
+                       class="text-[9px] uppercase tracking-[0.18em] text-slate-500">Label (optional)</label>
+                <input id="wallet-label" type="text" autocomplete="off" maxlength="60"
+                       placeholder="e.g. Cold storage, Trading wallet"
+                       class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950">
+              </div>
+              <div class="sm:col-span-1">
+                <button type="submit"
+                        class="w-full inline-flex items-center justify-center rounded-xl bg-slate-100 px-3 py-2.5 text-xs sm:text-sm font-medium text-slate-950 hover:bg-white/90 transition">
+                  Track wallet
+                </button>
+              </div>
+            </form>
+            <div class="mt-3 border-t border-slate-800 pt-3 sm:pt-4">
+              <p id="wallet-empty" class="text-[11px] text-slate-500">
+                No wallets saved yet. Add an address above to keep it handy.
+              </p>
+              <ul id="wallet-list" class="mt-1 space-y-2 text-xs sm:text-sm"></ul>
+            </div>
+          </section>
+
+          <!-- WATCHLIST -->
+          <section class="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4 sm:px-5 sm:py-5">
+            <header class="flex items-start justify-between gap-3">
+              <div>
+                <h2 class="text-sm font-semibold tracking-tight">Watchlist</h2>
+                <p class="mt-1 text-[11px] text-slate-500">
+                  Coins you're tracking but not necessarily holding.
+                </p>
+              </div>
+            </header>
+            <form id="watchlist-form" class="mt-3 flex flex-col sm:flex-row gap-2 text-xs sm:text-sm">
+              <select id="watchlist-select"
+                      class="flex-1 rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:ring-offset-1 focus:ring-offset-slate-950"></select>
+              <button type="submit"
+                      class="inline-flex items-center justify-center rounded-xl bg-slate-100 px-3 py-2 text-xs sm:text-sm font-medium text-slate-950 hover:bg-white/90 transition">
+                Add
+              </button>
+            </form>
+            <div class="mt-3 border-t border-slate-800 pt-3 sm:pt-4">
+              <p id="watchlist-empty" class="text-[11px] text-slate-500">
+                No watchlist yet. Add one above.
+              </p>
+              <ul id="watchlist-list" class="mt-1 space-y-2 text-xs sm:text-sm"></ul>
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="border-t border-slate-900 py-4">
+    <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-10 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
+      <p>All data stored locally. Prices via public CoinGecko + CryptoCompare APIs.</p>
+      <p>For experimentation only – not investment advice.</p>
+    </div>
+  </footer>
+</div>
+
+<script type="module" src="./scripts/main.js"></script>
+
 </body>
 </html>
