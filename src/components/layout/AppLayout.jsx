@@ -5,6 +5,7 @@ import AddAssetForm from '../AddAssetForm.jsx';
 import { useCrypto } from '../../context/crypto-context.jsx';
 import StrategyBacktester from '../StrategyBacktester.jsx';
 import NewsFeed from '../NewsFeed.jsx';
+import MarketOverview from '../MarketOverview.jsx';
 
 export default function AppLayout() {
   const { Header, Content, Sider } = Layout;
@@ -30,6 +31,7 @@ export default function AppLayout() {
             </Card>
           </Sider>
           <Content style={{ padding: '1rem' }}>
+            <MarketOverview />
             <AssetAllocationChart assets={assets} />
             <Card title="Holdings" bordered={false}>
               <List

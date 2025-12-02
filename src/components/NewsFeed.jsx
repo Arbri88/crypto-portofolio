@@ -1,38 +1,28 @@
 import { useState, useEffect } from 'react';
-import { List, Avatar, Card, Typography, Spin, Tag } from 'antd';
+import { List, Avatar, Card, Typography, Spin, Tag, Alert } from 'antd';
 import axios from 'axios';
-
-const DEMO_NEWS = [
-  {
-    id: 1,
-    title: 'Bitcoin Breaks $70k Resistance Level',
-    url: '#',
-    source: 'CryptoDaily',
-    published_on: Date.now() / 1000,
-    imageurl: 'https://cryptocompare.com/media/37746251/btc.png',
-  },
-  {
-    id: 2,
-    title: 'Ethereum Upgrade: What You Need To Know',
-    url: '#',
-    source: 'CoinDesk',
-    published_on: (Date.now() - 3600000) / 1000,
-    imageurl: 'https://cryptocompare.com/media/37746238/eth.png',
-  },
-];
 
 export default function NewsFeed() {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     async function getNews() {
       try {
-        const response = await axios.get('https://min-api.cryptocompare.com/data/v2/news/?lang=EN');
-        setNews(response.data.Data.slice(0, 6));
-      } catch (error) {
-        console.error('API Blocked by browser, loading demo data:', error);
-        setNews(DEMO_NEWS);
+        // TRICK: We use rss2json to convert Cointelegraph's RSS feed to JSON.
+        // This bypasses CORS and API keys completely.
+        const rssUrl = 'https://cointelegraph.com/rss';
+        const response = await axios.get(`https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}`);
+        
+        if (response.data.status === 'ok') {
+            setNews(response.data.items.slice(0, 6)); // Top 6 stories
+        } else {
+            throw new Error("Feed parsing failed");
+        }
+      } catch (err) {
+        console.error("News Error:", err);
+        setError(true);
       } finally {
         setLoading(false);
       }
@@ -40,27 +30,28 @@ export default function NewsFeed() {
     getNews();
   }, []);
 
-  if (loading) return <Spin />;
+  if (loading) return <div style={{textAlign:'center', padding: 20}}><Spin /></div>;
+  if (error) return <Alert message="Could not load news feed" type="warning" />;
 
   return (
-    <Card title="Crypto News">
+    <Card title="Market News (CoinTelegraph)">
       <List
         itemLayout="horizontal"
         dataSource={news}
         renderItem={(item) => (
           <List.Item>
             <List.Item.Meta
-              avatar={<Avatar shape="square" size={64} src={item.imageurl} />}
+              avatar={<Avatar shape="square" size={64} src={item.enclosure?.link || item.thumbnail} />}
               title={
-                <a href={item.url} target="_blank" rel="noreferrer">
+                <a href={item.link} target="_blank" rel="noreferrer" style={{ color: '#1890ff' }}>
                   {item.title}
                 </a>
               }
               description={
                 <div>
-                  <Tag color="blue">{item.source_info?.name || item.source}</Tag>
+                  <Tag color="gold">News</Tag>
                   <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
-                    {new Date(item.published_on * 1000).toLocaleDateString()}
+                    {new Date(item.pubDate).toLocaleDateString()}
                   </Typography.Text>
                 </div>
               }
