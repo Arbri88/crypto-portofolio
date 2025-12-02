@@ -1,5 +1,6 @@
 import { createContext, useState, useContext, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import BigNumber from 'bignumber.js';
 import { fetchRealCrypto } from '../api';
 
 const CryptoContext = createContext({
@@ -15,7 +16,18 @@ const defaultAssets = [
 ];
 
 function percentDifference(a, b) {
-  return +(100 * Math.abs((a - b) / ((a + b) / 2))).toFixed(2);
+  const bigA = new BigNumber(a);
+  const bigB = new BigNumber(b);
+
+  const average = bigA.plus(bigB).dividedBy(2);
+  if (average.isZero()) return 0;
+
+  return bigA
+    .minus(bigB)
+    .abs()
+    .dividedBy(average)
+    .multipliedBy(100)
+    .toNumber();
 }
 
 function mapAssets(assets = [], crypto = []) {
@@ -35,16 +47,20 @@ function mapAssets(assets = [], crypto = []) {
       };
     }
 
+    const amount = new BigNumber(asset.amount);
+    const currentPrice = new BigNumber(coin.price);
+    const purchasePrice = new BigNumber(asset.price);
+
     return {
       ...asset,
       name: coin.name,
       icon: coin.icon,
       price: coin.price,
       purchasePrice: asset.price,
-      grow: asset.price < coin.price,
-      growPercent: percentDifference(asset.price, coin.price),
-      totalAmount: +(asset.amount * coin.price).toFixed(2),
-      totalProfit: +(asset.amount * coin.price - asset.amount * asset.price).toFixed(2),
+      grow: purchasePrice.isLessThan(currentPrice),
+      growPercent: percentDifference(purchasePrice, currentPrice),
+      totalAmount: amount.multipliedBy(currentPrice).toFixed(2),
+      totalProfit: amount.multipliedBy(currentPrice.minus(purchasePrice)).toFixed(2),
     };
   });
 }

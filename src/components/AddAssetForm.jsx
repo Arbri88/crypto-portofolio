@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Select, Space, Divider, Form, InputNumber, Button, DatePicker, Result, message } from 'antd';
+import BigNumber from 'bignumber.js';
 import { useCrypto } from '../context/crypto-context.jsx';
 
 function CoinInfo({ coin }) {
@@ -63,8 +64,8 @@ export default function AddAssetForm({ onClose }) {
   function onFinish(values) {
     const newAsset = {
       id: coin.id,
-      amount: values.amount,
-      price: values.price,
+      amount: new BigNumber(values.amount).toString(),
+      price: new BigNumber(values.price).toString(),
       date: values.date ? values.date.$d : new Date(),
     };
 
@@ -80,7 +81,7 @@ export default function AddAssetForm({ onClose }) {
     if (price == null) return;
 
     form.setFieldsValue({
-      total: +(value * price).toFixed(2),
+      total: new BigNumber(value).multipliedBy(new BigNumber(price)).toFixed(2),
     });
   }
 
@@ -90,7 +91,7 @@ export default function AddAssetForm({ onClose }) {
     if (amount == null) return;
 
     form.setFieldsValue({
-      total: +(amount * value).toFixed(2),
+      total: new BigNumber(amount).multipliedBy(new BigNumber(value)).toFixed(2),
     });
   }
 
