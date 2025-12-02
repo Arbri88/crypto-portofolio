@@ -2,6 +2,25 @@ import { useState, useEffect } from 'react';
 import { List, Avatar, Card, Typography, Tag, Spin, Alert } from 'antd';
 import axios from 'axios';
 
+const FALLBACK_NEWS = [
+  {
+    id: 'demo-1',
+    title: 'Crypto markets hold steady despite macro headwinds',
+    url: '#',
+    source_info: { name: 'Demo Source' },
+    published_on: Date.now() / 1000,
+    imageurl: 'https://cryptocompare.com/media/37746251/btc.png',
+  },
+  {
+    id: 'demo-2',
+    title: 'Layer 2 networks continue to see strong user growth',
+    url: '#',
+    source_info: { name: 'Demo Source' },
+    published_on: (Date.now() - 3600 * 1000) / 1000,
+    imageurl: 'https://cryptocompare.com/media/37746238/eth.png',
+  },
+];
+
 export default function NewsFeed() {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);

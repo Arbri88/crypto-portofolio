@@ -15,6 +15,11 @@ export default function StrategyBacktester() {
   const handleRun = async () => {
     if (!selectedCoin) return message.warning('Select a coin first');
 
+    if (!selectedCoin.symbol) {
+      message.error('Selected asset is missing a tradable symbol. Please refresh or pick another coin.');
+      return;
+    }
+
     setLoading(true);
     setResult(null);
 
