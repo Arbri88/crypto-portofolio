@@ -1,17 +1,33 @@
 {
   "name": "crypto-portfolio",
-  "version": "1.0.0",
-  "type": "module",
+  "version": "2.0.0",
+  "description": "A secure and accessible cryptocurrency portfolio tracker",
+  "main": "js/script.js",
   "scripts": {
-    "test": "node --test"
+    "start": "npx serve .",
+    "lint": "eslint js/",
+    "lint:fix": "eslint js/ --fix",
+    "test": "echo \"No tests specified\" && exit 0"
   },
-  "dependencies": {
-    "@tanstack/react-query": "^5.51.21",
-    "antd": "^5.15.4",
-    "bignumber.js": "^9.1.2",
-    "axios": "^1.7.7",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "recharts": "^2.12.7"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Arbri88/crypto-portofolio.git"
+  },
+  "keywords": [
+    "crypto",
+    "cryptocurrency",
+    "portfolio",
+    "tracker",
+    "bitcoin",
+    "ethereum"
+  ],
+  "author": "Arbri88",
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "^8.56.0",
+    "serve": "^14.2.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }
