@@ -32,32 +32,41 @@ export default function AppLayout() {
             </Card>
           </Sider>
           <Content style={{ padding: '1rem' }}>
-            <MarketOverview />
-            <Row gutter={[16, 16]} style={{ marginBottom: '1rem' }}>
+            <div style={{ marginBottom: '1rem' }}>
+              <MarketOverview />
+            </div>
+            <Row gutter={[16, 16]}>
               <Col xs={24} lg={16}>
-                <PortfolioPieChart />
-                <Card title="Holdings" bordered={false} style={{ marginTop: '1rem' }}>
-                  <List
-                    dataSource={assets}
-                    renderItem={(item) => (
-                      <List.Item key={item.id}>
-                        <List.Item.Meta
-                          avatar={<img src={item.icon} alt={item.name} style={{ width: 32 }} />}
-                          title={<Typography.Text strong>{item.name}</Typography.Text>}
-                          description={`Amount: ${item.amount} • Current: $${item.price ?? 0}`}
-                        />
-                        <div style={{ textAlign: 'right' }}>
-                          <div>Total: ${item.totalAmount?.toFixed(2) ?? '0.00'}</div>
-                          <div style={{ color: item.grow ? '#22c55e' : '#ef4444' }}>
-                            {item.grow ? '+' : ''}
-                            {item.growPercent}%
-                          </div>
-                        </div>
-                      </List.Item>
-                    )}
-                  />
-                </Card>
+                <Row gutter={[16, 16]}>
+                  <Col span={24}>
+                    <PortfolioPieChart />
+                  </Col>
+                  <Col span={24}>
+                    <Card title="Holdings" bordered={false}>
+                      <List
+                        dataSource={assets}
+                        renderItem={(item) => (
+                          <List.Item key={item.id}>
+                            <List.Item.Meta
+                              avatar={<img src={item.icon} alt={item.name} style={{ width: 32 }} />}
+                              title={<Typography.Text strong>{item.name}</Typography.Text>}
+                              description={`Amount: ${item.amount} • Current: $${item.price ?? 0}`}
+                            />
+                            <div style={{ textAlign: 'right' }}>
+                              <div>Total: ${item.totalAmount?.toFixed(2) ?? '0.00'}</div>
+                              <div style={{ color: item.grow ? '#22c55e' : '#ef4444' }}>
+                                {item.grow ? '+' : ''}
+                                {item.growPercent}%
+                              </div>
+                            </div>
+                          </List.Item>
+                        )}
+                      />
+                    </Card>
+                  </Col>
+                </Row>
               </Col>
+
               <Col xs={24} lg={8}>
                 <div style={{ marginBottom: 16 }}>
                   <PerformanceIndices />

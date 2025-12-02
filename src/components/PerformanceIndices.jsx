@@ -8,6 +8,7 @@ export default function PerformanceIndices() {
   const [portfolioStats, setPortfolioStats] = useState({ m1: 0, m3: 0, y1: 0 });
   const [loading, setLoading] = useState(true);
 
+  // Benchmark Constants (from your request)
   const BENCHMARKS = {
     sp500: { m1: 2.0, m3: 5.0, y1: 8.0 },
     nasdaq: { m1: 2.5, m3: 6.5, y1: 11.0 },

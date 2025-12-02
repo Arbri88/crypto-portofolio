@@ -1,23 +1,19 @@
 import { useState } from 'react';
-import { Card, Select, InputNumber, Button, Statistic, Row, Col, message, Spin, Divider } from 'antd';
+import { Card, Select, InputNumber, Button, Statistic, Row, Col, message, Divider } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined, ExperimentOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useCrypto } from '../context/crypto-context';
 
 export default function StrategyBacktester() {
   const { crypto } = useCrypto();
-
   const [selectedCoin, setSelectedCoin] = useState(null);
   const [amount, setAmount] = useState(1000);
   const [duration, setDuration] = useState(365);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
-  const handleRunBacktest = async () => {
-    if (!selectedCoin) {
-      message.warning("Please select a coin first!");
-      return;
-    }
+  const handleRun = async () => {
+    if (!selectedCoin) return message.warning('Select a coin first');
 
     if (!selectedCoin.symbol) {
       message.error('Selected asset is missing a tradable symbol. Please refresh or pick another coin.');
@@ -28,65 +24,23 @@ export default function StrategyBacktester() {
     setResult(null);
 
     try {
-      const symbol = selectedCoin.symbol?.toUpperCase();
+      const sym = selectedCoin.symbol.toUpperCase();
+      const res = await axios.get(`https://min-api.cryptocompare.com/data/v2/histoday?fsym=${sym}&tsym=USD&limit=${duration}`);
 
-      if (!symbol) {
-        throw new Error('Missing symbol for selected asset');
-      }
+      const history = res.data.Data.Data;
+      if (!history.length) throw new Error('No Data');
 
-      const response = await axios.get('https://min-api.cryptocompare.com/data/v2/histoday', {
-        params: {
-          fsym: symbol,
-          tsym: 'USD',
-          limit: duration,
-        },
-      });
+      const startPrice = history[0].close;
+      const endPrice = history[history.length - 1].close;
 
-      const dataPoints = response.data.Data.Data; // CryptoCompare nests data twice
+      const coinCount = amount / startPrice;
+      const finalVal = coinCount * endPrice;
+      const profit = finalVal - amount;
+      const percent = (profit / amount) * 100;
 
-      if (!dataPoints || dataPoints.length === 0) {
-          throw new Error("No historical data returned");
-      }
-
-      // CryptoCompare returns data from Oldest -> Newest
-      const startData = dataPoints[0]; // Price 'duration' days ago
-      const endData = dataPoints[dataPoints.length - 1]; // Price today
-
-      // Use 'close' price for calculations
-      const startPrice = startData.close;
-      const currentPrice = endData.close;
-
-      if (!startPrice || !currentPrice) {
-          throw new Error("Invalid price data");
-      }
-
-      // Calculate Profit/Loss
-      const coinAmount = amount / startPrice;
-      const finalValue = coinAmount * currentPrice;
-      const profit = finalValue - amount;
-      const percentage = (profit / amount) * 100;
-
-      setResult({
-        initial: amount,
-        final: finalValue,
-        profit: profit,
-        percentage: percentage,
-        days: duration,
-        startPrice,
-        currentPrice,
-        coinName: selectedCoin.name
-      });
-
-      message.success("Backtest completed!");
-
-    } catch (error) {
-      console.error("Backtest failed:", error);
-      // Improved Error Message
-      message.error(
-        error.response?.status === 429 
-        ? "API Rate Limit Hit. Please wait 1 minute." 
-        : "Could not fetch historical data. Try a major coin like BTC."
-      );
+      setResult({ finalVal, profit, percent, startPrice, endPrice });
+    } catch (err) {
+      message.error('Could not fetch historical data');
     } finally {
       setLoading(false);
     }
@@ -98,39 +52,30 @@ export default function StrategyBacktester() {
         <Select
           showSearch
           placeholder="Select Asset"
-          style={{ width: 180 }}
+          style={{ width: 120 }}
           options={crypto.map((c) => ({ label: c.name, value: c.id, symbol: c.symbol }))}
-          onChange={(v, opt) => setSelectedCoin({ id: opt.value, name: opt.label, symbol: opt.symbol })}
+          onChange={(v, opt) => setSelectedCoin(opt)}
         />
         <InputNumber
           addonBefore="$"
-          defaultValue={amount}
-          min={1}
+          defaultValue={1000}
           onChange={setAmount}
-          style={{ width: 140 }}
+          style={{ width: 120 }}
         />
         <Select
-          defaultValue={duration}
+          defaultValue={365}
           onChange={setDuration}
-          style={{ width: 150 }}
+          style={{ width: 130 }}
           options={[
             { label: '1 Month', value: 30 },
             { label: '3 Months', value: 90 },
             { label: '1 Year', value: 365 },
           ]}
         />
-        <Button type="primary" onClick={handleRunBacktest} loading={loading}>
-          Run Backtest
-        </Button>
+        <Button type="primary" onClick={handleRun} loading={loading}>Run</Button>
       </div>
 
-      {loading && (
-        <div style={{ textAlign: 'center', padding: 20 }}>
-          <Spin />
-        </div>
-      )}
-
-      {result && !loading && (
+      {result && (
         <div
           style={{
             background: result.profit > 0 ? 'rgba(82, 196, 26, 0.1)' : 'rgba(255, 77, 79, 0.1)',
@@ -141,12 +86,12 @@ export default function StrategyBacktester() {
         >
           <Row gutter={16} style={{ textAlign: 'center' }}>
             <Col span={12}>
-              <Statistic title="Final Value" value={result.final} precision={2} prefix="$" />
+              <Statistic title="Final Value" value={result.finalVal} precision={2} prefix="$" />
             </Col>
             <Col span={12}>
               <Statistic
                 title="Total Return"
-                value={result.percentage}
+                value={result.percent}
                 precision={2}
                 suffix="%"
                 valueStyle={{ color: result.profit > 0 ? '#52c41a' : '#ff4d4f' }}
@@ -156,8 +101,8 @@ export default function StrategyBacktester() {
           </Row>
           <Divider style={{ margin: '10px 0' }} />
           <small style={{ color: 'gray', display: 'block', textAlign: 'center' }}>
-            Strategy: Buy & Hold ({result.days} days).<br />
-            Buy Price: ${result.startPrice.toFixed(2)} → Sell Price: ${result.currentPrice.toFixed(2)}
+            Strategy: Buy & Hold ({duration} days).<br />
+            Buy Price: ${result.startPrice.toFixed(2)} → Sell Price: ${result.endPrice.toFixed(2)}
           </small>
         </div>
       )}
