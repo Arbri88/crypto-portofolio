@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Select, Space, Divider, Form, InputNumber, Button, DatePicker, Result, message } from 'antd';
 import BigNumber from 'bignumber.js';
-import { useCrypto } from '../context/crypto-context.jsx';
+import { useCrypto } from '../../context/crypto-context.jsx';
 
 function CoinInfo({ coin }) {
   if (!coin) return null;
@@ -25,6 +25,29 @@ export default function AddAssetForm({ onClose }) {
 
   const [messageApi, contextHolder] = message.useMessage();
 
+  const cryptoOptions = useMemo(
+    () =>
+      crypto.map((c) => ({
+        label: c.name,
+        value: c.id,
+        icon: c.icon,
+      })),
+    [crypto],
+  );
+
+  const initialValues = useMemo(
+    () => ({
+      price: coin ? Number(coin.price ?? 0) : undefined,
+    }),
+    [coin],
+  );
+
+  function handleClose() {
+    setSubmitted(false);
+    setCoin(null);
+    onClose?.();
+  }
+
   if (submitted) {
     return (
       <Result
@@ -32,7 +55,7 @@ export default function AddAssetForm({ onClose }) {
         title="New Asset Added!"
         subTitle={`Added ${form.getFieldValue('amount')} of ${coin.name} to your portfolio.`}
         extra={[
-          <Button type="primary" key="console" onClick={onClose}>
+          <Button type="primary" key="console" onClick={handleClose}>
             Close
           </Button>,
         ]}
@@ -46,11 +69,7 @@ export default function AddAssetForm({ onClose }) {
         style={{ width: '100%' }}
         onSelect={(v) => setCoin(crypto.find((c) => c.id === v))}
         placeholder="Select Coin"
-        options={crypto.map((c) => ({
-          label: c.name,
-          value: c.id,
-          icon: c.icon,
-        }))}
+        options={cryptoOptions}
         optionRender={(option) => (
           <Space>
             <img style={{ width: 20 }} src={option.data.icon} alt={option.data.label} />{' '}
@@ -62,11 +81,14 @@ export default function AddAssetForm({ onClose }) {
   }
 
   function onFinish(values) {
+    const amount = new BigNumber(values.amount ?? 0);
+    const price = new BigNumber(values.price ?? 0);
+
     const newAsset = {
       id: coin.id,
-      amount: new BigNumber(values.amount).toString(),
-      price: new BigNumber(values.price).toString(),
-      date: values.date ? values.date.$d : new Date(),
+      amount: amount.toString(),
+      price: price.toString(),
+      date: values.date?.toDate?.() ?? new Date(),
     };
 
     addAsset(newAsset);
@@ -78,7 +100,7 @@ export default function AddAssetForm({ onClose }) {
   function handleAmountChange(value) {
     const price = form.getFieldValue('price');
 
-    if (price == null) return;
+    if (price == null || value == null) return;
 
     form.setFieldsValue({
       total: new BigNumber(value).multipliedBy(new BigNumber(price)).toFixed(2),
@@ -88,7 +110,7 @@ export default function AddAssetForm({ onClose }) {
   function handlePriceChange(value) {
     const amount = form.getFieldValue('amount');
 
-    if (amount == null) return;
+    if (amount == null || value == null) return;
 
     form.setFieldsValue({
       total: new BigNumber(amount).multipliedBy(new BigNumber(value)).toFixed(2),
@@ -104,9 +126,7 @@ export default function AddAssetForm({ onClose }) {
         labelCol={{ span: 6 }}
         wrapperCol={{ span: 18 }}
         style={{ maxWidth: 600 }}
-        initialValues={{
-          price: +coin.price.toFixed(2),
-        }}
+        initialValues={initialValues}
         onFinish={onFinish}
         validateMessages={{ required: '${label} is required!' }}
       >

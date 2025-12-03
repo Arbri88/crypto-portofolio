@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Table, Typography, Tag } from 'antd';
 import axios from 'axios';
-import { useCrypto } from '../context/crypto-context';
+import { useCrypto } from '../../context/crypto-context.jsx';
 
 export default function PerformanceIndices() {
   const { assets } = useCrypto();

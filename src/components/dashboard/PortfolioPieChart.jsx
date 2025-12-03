@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card, Typography } from 'antd';
-import { useCrypto } from '../context/crypto-context';
+import { useCrypto } from '../../context/crypto-context.jsx';
 
 // An elegant color palette
 const COLORS = [
@@ -15,22 +15,28 @@ const COLORS = [
   '#4BC0C0', // Light Teal
 ];
 
+const formatMoney = (value = 0) =>
+  value.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
 // Custom Tooltip to show accurate money values on hover
 const CustomTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
-      <div style={{
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        padding: '10px 15px',
-        border: '1px solid #f0f0f0',
-        borderRadius: '8px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-      }}>
+      <div
+        style={{
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          padding: '10px 15px',
+          border: '1px solid #f0f0f0',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        }}
+      >
         <p style={{ margin: 0, fontWeight: 'bold', color: '#333' }}>{data.name}</p>
-        <p style={{ margin: 0, color: '#1890ff' }}>
-          ${data.value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-        </p>
+        <p style={{ margin: 0, color: '#1890ff' }}>${formatMoney(data.value)}</p>
         <p style={{ margin: 0, fontSize: '10px', color: '#888' }}>
           {(data.percent * 100).toFixed(1)}% of portfolio
         </p>
@@ -43,14 +49,21 @@ const CustomTooltip = ({ active, payload }) => {
 export default function PortfolioPieChart() {
   const { assets } = useCrypto();
 
-  // 1. Transform assets into chart data
-  const data = assets.map(asset => ({
-    name: asset.name,
-    value: asset.totalAmount,
-  })).filter(item => item.value > 0); // Hide zero balances
+  const data = useMemo(
+    () =>
+      assets
+        .map((asset) => ({
+          name: asset.name,
+          value: asset.totalAmount,
+        }))
+        .filter((item) => item.value > 0),
+    [assets],
+  );
 
-  // 2. Calculate Total Portfolio Value for the Center Text
-  const totalPortfolioValue = data.reduce((acc, item) => acc + item.value, 0);
+  const totalPortfolioValue = useMemo(
+    () => data.reduce((acc, item) => acc + item.value, 0),
+    [data],
+  );
 
   return (
     <Card 
@@ -97,7 +110,7 @@ export default function PortfolioPieChart() {
             <Typography.Text type="secondary" style={{ fontSize: '12px' }}>Total Balance</Typography.Text>
             <br />
             <Typography.Text strong style={{ fontSize: '20px' }}>
-              ${totalPortfolioValue.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+              ${formatMoney(totalPortfolioValue)}
             </Typography.Text>
         </div>
 
