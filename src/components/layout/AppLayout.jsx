@@ -1,17 +1,26 @@
 import { Layout, Card, Switch, ConfigProvider, theme, Typography, List, Row, Col } from 'antd';
-import { useState } from 'react';
-import AddAssetForm from '../AddAssetForm.jsx';
+import { useMemo, useState } from 'react';
+import AddAssetForm from '../forms/AddAssetForm.jsx';
+import NewsFeed from '../dashboard/NewsFeed.jsx';
+import PortfolioPieChart from '../dashboard/PortfolioPieChart.jsx';
+import StrategyBacktester from '../dashboard/StrategyBacktester.jsx';
+import PerformanceIndices from '../dashboard/PerformanceIndices.jsx';
+import MarketOverview from '../dashboard/MarketOverview.jsx';
 import { useCrypto } from '../../context/crypto-context.jsx';
-import StrategyBacktester from '../StrategyBacktester.jsx';
-import NewsFeed from '../NewsFeed.jsx';
-import MarketOverview from '../MarketOverview.jsx';
-import PortfolioPieChart from '../PortfolioPieChart.jsx';
-import PerformanceIndices from '../PerformanceIndices.jsx';
 
 export default function AppLayout() {
   const { Header, Content, Sider } = Layout;
   const [darkMode, setDarkMode] = useState(true);
   const { assets } = useCrypto();
+
+  const formatCurrency = useMemo(
+    () => (value) =>
+      (value ?? 0).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    [],
+  );
 
   return (
     <ConfigProvider theme={{ algorithm: darkMode ? theme.darkAlgorithm : theme.defaultAlgorithm }}>
@@ -53,7 +62,7 @@ export default function AppLayout() {
                               description={`Amount: ${item.amount} • Current: $${item.price ?? 0}`}
                             />
                             <div style={{ textAlign: 'right' }}>
-                              <div>Total: ${item.totalAmount?.toFixed(2) ?? '0.00'}</div>
+                              <div>Total: ${formatCurrency(item.totalAmount)}</div>
                               <div style={{ color: item.grow ? '#22c55e' : '#ef4444' }}>
                                 {item.grow ? '+' : ''}
                                 {item.growPercent}%

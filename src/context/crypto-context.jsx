@@ -1,4 +1,4 @@
-import { createContext, useState, useContext, useEffect } from 'react';
+import { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
 import { fetchRealCrypto } from '../api';
@@ -33,34 +33,34 @@ function percentDifference(a, b) {
 function mapAssets(assets = [], crypto = []) {
   return assets.map((asset) => {
     const coin = crypto.find((c) => c.id === asset.id);
+    const amount = new BigNumber(asset.amount ?? 0);
+    const purchasePrice = new BigNumber(asset.price ?? 0);
 
     if (!coin) {
       return {
         ...asset,
-        price: asset.price ?? 0,
-        purchasePrice: asset.price,
+        price: purchasePrice.toNumber(),
+        purchasePrice: purchasePrice.toNumber(),
         grow: false,
         growPercent: 0,
-        totalAmount: 0,
+        totalAmount: amount.multipliedBy(purchasePrice).toNumber(),
         totalProfit: 0,
         name: asset.id,
       };
     }
 
-    const amount = new BigNumber(asset.amount);
-    const currentPrice = new BigNumber(coin.price);
-    const purchasePrice = new BigNumber(asset.price);
+    const currentPrice = new BigNumber(coin.price ?? 0);
 
     return {
       ...asset,
       name: coin.name,
       icon: coin.icon,
       price: coin.price,
-      purchasePrice: asset.price,
+      purchasePrice: purchasePrice.toNumber(),
       grow: purchasePrice.isLessThan(currentPrice),
       growPercent: percentDifference(purchasePrice, currentPrice),
-      totalAmount: amount.multipliedBy(currentPrice).toFixed(2),
-      totalProfit: amount.multipliedBy(currentPrice.minus(purchasePrice)).toFixed(2),
+      totalAmount: amount.multipliedBy(currentPrice).toNumber(),
+      totalProfit: amount.multipliedBy(currentPrice.minus(purchasePrice)).toNumber(),
     };
   });
 }
@@ -78,37 +78,34 @@ export function CryptoContextProvider({ children }) {
 
   useEffect(() => {
     const savedAssets = localStorage.getItem('portfolio_assets');
-    let baseAssets;
-
-    if (savedAssets) {
-      baseAssets = JSON.parse(savedAssets);
-    } else {
-      baseAssets = defaultAssets;
-    }
+    const baseAssets = savedAssets ? JSON.parse(savedAssets) : defaultAssets;
 
     setAssets(baseAssets);
     localStorage.setItem('portfolio_assets', JSON.stringify(baseAssets));
   }, []);
 
-  function addAsset(newAsset) {
+  const addAsset = useCallback((newAsset) => {
     setAssets((prev) => {
       const updatedAssets = [...prev, newAsset];
       localStorage.setItem('portfolio_assets', JSON.stringify(updatedAssets));
       return updatedAssets;
     });
-  }
+  }, []);
 
-  const mappedAssets = mapAssets(assets, crypto);
+  const mappedAssets = useMemo(() => mapAssets(assets, crypto), [assets, crypto]);
+
+  const contextValue = useMemo(
+    () => ({
+      loading: isLoading,
+      crypto,
+      assets: mappedAssets,
+      addAsset,
+    }),
+    [addAsset, crypto, isLoading, mappedAssets],
+  );
 
   return (
-    <CryptoContext.Provider
-      value={{
-        loading: isLoading,
-        crypto,
-        assets: mappedAssets,
-        addAsset,
-      }}
-      >
+    <CryptoContext.Provider value={contextValue}>
       {children}
     </CryptoContext.Provider>
   );

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Card, Select, InputNumber, Button, Statistic, Row, Col, message, Divider } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined, ExperimentOutlined } from '@ant-design/icons';
 import axios from 'axios';
-import { useCrypto } from '../context/crypto-context';
+import { useCrypto } from '../../context/crypto-context.jsx';
 
 export default function StrategyBacktester() {
   const { crypto } = useCrypto();
