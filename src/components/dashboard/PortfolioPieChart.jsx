@@ -22,7 +22,7 @@ const formatMoney = (value = 0) =>
   });
 
 // Custom Tooltip to show accurate money values on hover
-const CustomTooltip = ({ active, payload }) => {
+const CustomTooltip = ({ active, payload, balanceHidden }) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
@@ -36,10 +36,14 @@ const CustomTooltip = ({ active, payload }) => {
         }}
       >
         <p style={{ margin: 0, fontWeight: 'bold', color: '#333' }}>{data.name}</p>
-        <p style={{ margin: 0, color: '#1890ff' }}>${formatMoney(data.value)}</p>
-        <p style={{ margin: 0, fontSize: '10px', color: '#888' }}>
-          {(data.percent * 100).toFixed(1)}% of portfolio
+        <p style={{ margin: 0, color: '#1890ff' }}>
+          {balanceHidden ? 'Hidden' : `$${formatMoney(data.value)}`}
         </p>
+        {!balanceHidden && (
+          <p style={{ margin: 0, fontSize: '10px', color: '#888' }}>
+            {(data.percent * 100).toFixed(1)}% of portfolio
+          </p>
+        )}
       </div>
     );
   }
@@ -47,7 +51,7 @@ const CustomTooltip = ({ active, payload }) => {
 };
 
 export default function PortfolioPieChart() {
-  const { assets } = useCrypto();
+  const { assets, balanceHidden } = useCrypto();
 
   const data = useMemo(
     () =>
@@ -60,10 +64,9 @@ export default function PortfolioPieChart() {
     [assets],
   );
 
-  const totalPortfolioValue = useMemo(
-    () => data.reduce((acc, item) => acc + item.value, 0),
-    [data],
-  );
+  const totalPortfolioValue = useMemo(() => data.reduce((acc, item) => acc + item.value, 0), [data]);
+
+  const centerLabel = balanceHidden ? 'Hidden' : `$${formatMoney(totalPortfolioValue)}`;
 
   return (
     <Card 
@@ -93,7 +96,7 @@ export default function PortfolioPieChart() {
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip balanceHidden={balanceHidden} />} />
             <Legend verticalAlign="bottom" height={36} iconType="circle" />
           </PieChart>
         </ResponsiveContainer>
@@ -110,7 +113,7 @@ export default function PortfolioPieChart() {
             <Typography.Text type="secondary" style={{ fontSize: '12px' }}>Total Balance</Typography.Text>
             <br />
             <Typography.Text strong style={{ fontSize: '20px' }}>
-              ${formatMoney(totalPortfolioValue)}
+              {centerLabel}
             </Typography.Text>
         </div>
 
