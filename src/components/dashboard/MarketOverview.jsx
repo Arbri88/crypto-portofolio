@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Statistic, Row, Col, Progress, Skeleton, Tag, Typography } from 'antd';
 import axios from 'axios';
+import { getCoinGeckoHeaders } from '../../api';
 
 export default function MarketOverview() {
   const [globalData, setGlobalData] = useState(null);
@@ -11,7 +12,7 @@ export default function MarketOverview() {
     async function fetchMarketSignals() {
       try {
         const [globalResponse, fearGreedResponse] = await Promise.all([
-          axios.get('https://api.coingecko.com/api/v3/global'),
+          axios.get('https://api.coingecko.com/api/v3/global', { headers: getCoinGeckoHeaders() }),
           axios.get('https://api.alternative.me/fng/', { params: { limit: 1 } }),
         ]);
 

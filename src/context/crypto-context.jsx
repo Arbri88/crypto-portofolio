@@ -51,7 +51,7 @@ function mapAssets(assets = [], crypto = []) {
       };
     }
 
-    const currentPrice = new BigNumber(coin.price ?? 0);
+    const currentPrice = new BigNumber(coin.price ?? purchasePrice);
 
     return {
       ...asset,
