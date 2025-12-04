@@ -7,7 +7,9 @@ const CryptoContext = createContext({
   assets: [],
   crypto: [],
   loading: false,
+  balanceHidden: false,
   addAsset: () => {},
+  toggleBalanceVisibility: () => {},
 });
 
 const defaultAssets = [
@@ -67,6 +69,10 @@ function mapAssets(assets = [], crypto = []) {
 
 export function CryptoContextProvider({ children }) {
   const [assets, setAssets] = useState([]);
+  const [balanceHidden, setBalanceHidden] = useState(() => {
+    const storedPreference = localStorage.getItem('portfolio_balance_hidden');
+    return storedPreference ? JSON.parse(storedPreference) : false;
+  });
 
   const { data: cryptoData, isLoading } = useQuery({
     queryKey: ['coins'],
@@ -92,16 +98,26 @@ export function CryptoContextProvider({ children }) {
     });
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem('portfolio_balance_hidden', JSON.stringify(balanceHidden));
+  }, [balanceHidden]);
+
   const mappedAssets = useMemo(() => mapAssets(assets, crypto), [assets, crypto]);
+
+  const toggleBalanceVisibility = useCallback(() => {
+    setBalanceHidden((prev) => !prev);
+  }, []);
 
   const contextValue = useMemo(
     () => ({
       loading: isLoading,
       crypto,
       assets: mappedAssets,
+      balanceHidden,
       addAsset,
+      toggleBalanceVisibility,
     }),
-    [addAsset, crypto, isLoading, mappedAssets],
+    [addAsset, balanceHidden, crypto, isLoading, mappedAssets, toggleBalanceVisibility],
   );
 
   return (
