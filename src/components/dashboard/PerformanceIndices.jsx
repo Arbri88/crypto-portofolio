@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, Table, Typography, Tag } from 'antd';
 import axios from 'axios';
 import { useCrypto } from '../../context/crypto-context.jsx';
+import { getCoinGeckoHeaders } from '../../api';
 
 export default function PerformanceIndices() {
   const { assets } = useCrypto();
@@ -26,7 +27,7 @@ export default function PerformanceIndices() {
       try {
         const response = await axios.get(
           `https://api.coingecko.com/api/v3/coins/${topAsset.id}/market_chart`,
-          { params: { vs_currency: 'usd', days: 365, interval: 'daily' } },
+          { params: { vs_currency: 'usd', days: 365, interval: 'daily' }, headers: getCoinGeckoHeaders() },
         );
 
         const prices = response.data.prices;

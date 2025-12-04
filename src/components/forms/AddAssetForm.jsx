@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Select, Space, Divider, Form, InputNumber, Button, DatePicker, Result, message } from 'antd';
+import { Select, Space, Divider, Form, InputNumber, Button, DatePicker, Result, message, Alert, Skeleton } from 'antd';
 import BigNumber from 'bignumber.js';
 import { useCrypto } from '../../context/crypto-context.jsx';
 
@@ -19,7 +19,7 @@ function CoinInfo({ coin }) {
 
 export default function AddAssetForm({ onClose }) {
   const [form] = Form.useForm();
-  const { crypto, addAsset } = useCrypto();
+  const { crypto, addAsset, loading } = useCrypto();
   const [coin, setCoin] = useState(null);
   const [submitted, setSubmitted] = useState(false);
 
@@ -64,6 +64,21 @@ export default function AddAssetForm({ onClose }) {
   }
 
   if (!coin) {
+    if (loading) {
+      return <Skeleton active />;
+    }
+
+    if (cryptoOptions.length === 0) {
+      return (
+        <Alert
+          type="warning"
+          showIcon
+          message="Coin data unavailable"
+          description="We couldn't load the market list. Please set VITE_COINGECKO_API_KEY in your environment or try again later."
+        />
+      );
+    }
+
     return (
       <Select
         style={{ width: '100%' }}
